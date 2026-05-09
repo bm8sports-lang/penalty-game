@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>点球大战</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { overflow:hidden; background:#1b4020; font-family:'Segoe UI',Arial,sans-serif; user-select:none; }
+    #c { display:block; }
+    .hud { position:fixed; top:14px; left:50%; transform:translateX(-50%); display:flex; gap:24px; background:rgba(0,0,0,0.55); backdrop-filter:blur(8px); padding:9px 28px; border-radius:40px; color:#fff; z-index:10; }
+    .hi { display:flex; flex-direction:column; align-items:center; gap:1px; }
+    .hl { font-size:10px; color:rgba(255,255,255,.45); text-transform:uppercase; letter-spacing:.06em; }
+    .hv { font-size:22px; font-weight:700; }
+    #statusMsg { position:fixed; top:42%; left:50%; transform:translate(-50%,-50%); font-size:40px; font-weight:900; color:#fff; text-shadow:0 2px 18px rgba(0,0,0,.8); pointer-events:none; z-index:10; opacity:0; transition:opacity .2s; }
+    #statusMsg.show { opacity:1; }
+    #streakBadge { position:fixed; top:78px; left:50%; transform:translateX(-50%); font-size:16px; font-weight:700; color:#ffd700; text-shadow:0 1px 4px rgba(0,0,0,.6); z-index:10; }
+    .pips { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); display:flex; gap:10px; z-index:10; }
+    .pip { width:17px; height:17px; border-radius:50%; border:2.5px solid rgba(255,255,255,.45); background:transparent; transition:background .3s,border-color .3s; }
+    .pip.goal { background:#00e676; border-color:#00e676; }
+    .pip.miss { background:#ff5252; border-color:#ff5252; }
+    #shotLabel { position:fixed; bottom:47px; left:50%; transform:translateX(-50%); color:rgba(255,255,255,.55); font-size:13px; z-index:10; }
+    #aimHint   { position:fixed; bottom:9%; left:50%; transform:translateX(-50%); color:#fff; font-size:16px; font-weight:600; letter-spacing:.04em; text-shadow:0 2px 8px rgba(0,0,0,.8); pointer-events:none; z-index:10; }
+    #musicBtn  { position:fixed; top:14px; right:16px; width:42px; height:42px; border-radius:50%; background:rgba(0,0,0,.55); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,.15); color:#fff; font-size:20px; cursor:pointer; z-index:11; display:flex; align-items:center; justify-content:center; transition:background .2s; user-select:none; }
+    #musicBtn:hover { background:rgba(0,0,0,.75); }
+    .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:50; align-items:center; justify-content:center; }
+    .overlay.open { display:flex; }
+    .modal { background:#0f2010; border-radius:20px; padding:40px 52px; text-align:center; color:#fff; min-width:300px; box-shadow:0 24px 64px rgba(0,0,0,.6); border:1px solid rgba(100,255,100,.18); animation:popIn .3s cubic-bezier(.34,1.56,.64,1); }
+    @keyframes popIn { from { transform:scale(.65); opacity:0; } }
+    .me { font-size:64px; margin-bottom:6px; }
+    .mt { font-size:28px; font-weight:800; margin-bottom:6px; }
+    .ms { font-size:18px; color:rgba(255,255,255,.65); margin-bottom:4px; }
+    .mf { font-size:13px; color:rgba(255,255,255,.35); margin-bottom:24px; }
+    .btn { padding:13px 36px; font-size:16px; font-weight:700; background:#2e7d32; color:#fff; border:none; border-radius:50px; cursor:pointer; transition:background .2s,transform .1s; }
+    .btn:hover { background:#1b5e20; }
+    .btn:active { transform:scale(.96); }
+    /* Loading screen */
+    #loadScreen { position:fixed; inset:0; background:#0d1f10; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:20px; z-index:999; }
+    #loadScreen.hidden { display:none; }
+    .ls-ball { font-size:64px; animation:spin 1.2s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .ls-txt { color:#fff; font-size:18px; font-weight:600; letter-spacing:.08em; }
+    .ls-bar { width:260px; height:6px; background:rgba(255,255,255,.15); border-radius:4px; overflow:hidden; }
+    .ls-fill { height:100%; width:0%; background:#00e676; border-radius:4px; transition:width .2s; }
+    .ls-hint { color:rgba(255,255,255,.4); font-size:12px; text-align:center; max-width:320px; line-height:1.6; }
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="loadScreen">
+  <div class="ls-ball">⚽</div>
+  <div class="ls-txt">加载资源中…</div>
+  <div class="ls-bar"><div class="ls-fill" id="lsFill"></div></div>
+  <div class="ls-hint">如需使用自定义素材，请将图片放入 assets/ 文件夹<br>缺失图片将自动使用内置画面</div>
+</div>
+<div class="hud">
+  <div class="hi"><span class="hl">本局进球</span><span class="hv" id="hGoals">0</span></div>
+  <div class="hi"><span class="hl">连续</span><span class="hv" id="hStreak">0</span></div>
+  <div class="hi"><span class="hl">最高</span><span class="hv" id="hBest">0</span></div>
+</div>
+<div id="streakBadge"></div>
+<div id="statusMsg"></div>
+<div id="shotLabel"></div>
+<div class="pips" id="pips"></div>
+<div id="aimHint">点击球门任意位置射门</div>
+<button id="musicBtn" title="音乐 / Music">🔇</button>
+<audio id="bgm" src="assets/bgm.mp3" loop preload="auto"></audio>
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="me" id="mEmoji"></div><div class="mt" id="mTitle"></div>
+    <div class="ms" id="mScore"></div><div class="mf" id="mFlavor"></div>
+    <button class="btn" onclick="restart()">再来一局 ⚽</button>
+  </div>
+</div>
+<script>
+const c=document.getElementById('c'), ctx=c.getContext('2d');
+
+// ── Image asset loader ─────────────────────────────────────────────────────
+// Put your PNG files in  Desktop/assets/  next to penalty.html
+// Each asset falls back to built-in canvas drawing if the file is missing.
+const ASSET_SRC={
+  bg:      'assets/bg.png',       // 1280×720  全场景背景（含建筑/天空/涂鸦/棕榈/彩旗）
+  ball:    'assets/ball.png',     // 256×256   足球，透明背景
+  gk_idle: 'assets/gk_idle.png', // 220×440   门将待机，透明背景
+  gk_left: 'assets/gk_dive_l.png',// 440×320  门将扑左，透明背景
+  gk_right:'assets/gk_dive_r.png',// 440×320  门将扑右，透明背景（可水平翻转 gk_dive_l）
+  gk_up:   'assets/gk_up.png',   // 220×440   门将起跳，透明背景
+};
+const img={};
+function loadAssets(done){
+  const keys=Object.keys(ASSET_SRC), total=keys.length; let n=0;
+  const fill=document.getElementById('lsFill');
+  keys.forEach(k=>{
+    const i=new Image();
+    const finish=()=>{ img[k]=i.complete&&i.naturalWidth?i:null; n++;
+      if(fill)fill.style.width=(n/total*100)+'%';
+      if(n>=total)done(); };
+    i.onload=finish; i.onerror=finish; i.src=ASSET_SRC[k];
+  });
+}
+
+// ── Layout ─────────────────────────────────────────────────────────────────
+const L={};
+function computeLayout(){
+  const W=c.width,H=c.height; L.W=W;L.H=H;
+  L.br0=Math.min(W,H)*.085;
+
+  if(img.bg){
+    // Map the goal's actual pixel positions in bg.png to canvas coords,
+    // using the same cover-fit transform as the background draw.
+    const bw=img.bg.naturalWidth, bh=img.bg.naturalHeight;
+    const s=Math.max(W/bw, H/bh);
+    const ox=(W-bw*s)/2, oy=(H-bh*s)/2;
+    // Goal inner frame — strict-red pixel scan on bg.png (1280×720):
+    // Left post core x=320-328, Right post core x=965-978
+    // Crossbar y=211-225, Bottom bar y=448-458
+    const ix1=330, ix2=963,  // just inside the neon post cores
+          iy1=228, iy2=445;  // just inside crossbar → just above bottom bar
+    L.gx1=Math.max(1,      ox+ix1*s);
+    L.gx2=Math.min(W-1,    ox+ix2*s);
+    L.gy1=Math.max(1,      oy+iy1*s);
+    L.gy2=Math.min(H*.82,  oy+iy2*s); // cap so ball area is always visible
+  } else {
+    L.gx1=W*.24; L.gx2=W*.76; L.gy1=H*.18; L.gy2=H*.58;
+  }
+
+  L.gw=L.gx2-L.gx1; L.gh=L.gy2-L.gy1;
+  L.vpX=(L.gx1+L.gx2)*.5;  // GK centered on goal (not canvas)
+  L.bx0=(L.gx1+L.gx2)*.5;  // ball centered on goal
+  L.by0=L.gy2+(H-L.gy2)*.50; // ball: midpoint of area below goal
+}
+
+// ── PRNG ───────────────────────────────────────────────────────────────────
+function prng(s){
+  return ()=>{ s|=0;s=(s+0x6D2B79F5)|0; let t=Math.imul(s^(s>>>15),1|s); t=(t+Math.imul(t^(t>>>7),61|t))^t; return((t^(t>>>14))>>>0)/4294967296; };
+}
+
+// ── Pre-rendered caches ────────────────────────────────────────────────────
+let bgCache=null, grassCache=null;
+
+function buildBG(){
+  const W=c.width,H=c.height;
+  const o=document.createElement('canvas');o.width=W;o.height=H;
+  const g=o.getContext('2d');
+  const horizon=H*.58; // matches L.gy2
+
+  // ── Sky (clean light blue, no clouds) ─────────────────────────────────────
+  const sk=g.createLinearGradient(0,0,0,horizon);
+  sk.addColorStop(0,'#4aa8d8');
+  sk.addColorStop(.45,'#6bbce0');
+  sk.addColorStop(.80,'#90cfe8');
+  sk.addColorStop(1,'#b8e2f2');
+  g.fillStyle=sk; g.fillRect(0,0,W,horizon+2);
+
+  // ── LEFT BUILDING — salmon/pink Mediterranean style ────────────────────────
+  const lbW=W*.34, lbH=horizon-H*.02;
+  const lbY=H*.02;
+  // Main facade — warm salmon/terracotta
+  g.fillStyle='#d4614e';
+  g.fillRect(0,lbY,lbW,lbH);
+  // Left-to-right gradient (light on left, darker right)
+  const lbGrad=g.createLinearGradient(0,0,lbW,0);
+  lbGrad.addColorStop(0,'rgba(255,200,180,0.12)');
+  lbGrad.addColorStop(0.6,'rgba(0,0,0,0)');
+  lbGrad.addColorStop(1,'rgba(0,0,0,0.20)');
+  g.fillStyle=lbGrad; g.fillRect(0,lbY,lbW,lbH);
+  // Top shading
+  const lbTop=g.createLinearGradient(0,lbY,0,lbY+H*.12);
+  lbTop.addColorStop(0,'rgba(0,0,0,0.25)'); lbTop.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=lbTop; g.fillRect(0,lbY,lbW,H*.12);
+  // Rooftop parapet
+  g.fillStyle='#c05040';
+  g.fillRect(0,lbY,lbW,H*.025);
+  g.fillStyle='rgba(255,255,255,0.08)';
+  g.fillRect(0,lbY,lbW,H*.012);
+
+  // Windows with shutters (left building)
+  const wCols=3, wRows=4;
+  const wW=Math.min(lbW*.13,W*.042), wH=H*.062;
+  const wPadX=lbW/(wCols+1), wPadY=(lbH-H*.20)/(wRows+1);
+  for(let wr=0;wr<wRows;wr++){
+    for(let wc=0;wc<wCols;wc++){
+      const wx=wPadX*(wc+0.5+0.25)-wW/2;
+      const wy=lbY+H*.06+wPadY*(wr+1)-wH/2;
+      if(wy+wH>horizon-H*.16) continue;
+      // Shutter panels (purple-blue)
+      g.fillStyle='#6055a0';
+      g.fillRect(wx-wW*.22,wy-wH*.08,wW*.22,wH*1.16);
+      g.fillRect(wx+wW,wy-wH*.08,wW*.22,wH*1.16);
+      // Window glass
+      g.fillStyle='rgba(160,200,235,0.78)';
+      g.fillRect(wx,wy,wW,wH);
+      // Reflection
+      g.fillStyle='rgba(255,255,255,0.22)';
+      g.fillRect(wx+wW*.1,wy+wH*.05,wW*.28,wH*.38);
+      // Frame
+      g.strokeStyle='rgba(50,35,80,0.45)'; g.lineWidth=1;
+      g.strokeRect(wx,wy,wW,wH);
+      // Sill
+      g.fillStyle='rgba(255,255,255,0.15)';
+      g.fillRect(wx-wW*.22,wy+wH,wW*1.44,H*.008);
+      // Shutter horizontal lines
+      g.strokeStyle='rgba(40,25,70,0.35)'; g.lineWidth=0.7;
+      for(let sl=1;sl<=4;sl++){
+        g.beginPath(); g.moveTo(wx-wW*.22,wy+wH*sl/5); g.lineTo(wx,wy+wH*sl/5); g.stroke();
+        g.beginPath(); g.moveTo(wx+wW,wy+wH*sl/5); g.lineTo(wx+wW*1.22,wy+wH*sl/5); g.stroke();
+      }
+    }
+  }
+  // Green striped awning at the base of left building
+  const awY=horizon-H*.145, awH=H*.095;
+  const awStripes=9;
+  for(let ai=0;ai<awStripes;ai++){
+    const ax=ai*lbW/awStripes;
+    g.fillStyle=ai%2===0?'#1e6b22':'#25882a';
+    g.beginPath();
+    g.moveTo(ax,awY); g.lineTo(ax+lbW/awStripes+1,awY);
+    g.lineTo(ax+lbW/awStripes+W*.012,awY+awH);
+    g.lineTo(ax-W*.012,awY+awH);
+    g.closePath(); g.fill();
+  }
+  // Awning highlight
+  g.fillStyle='rgba(255,255,255,0.12)';
+  g.fillRect(0,awY,lbW,awH*.28);
+  // Awning shadow underside
+  g.fillStyle='rgba(0,0,0,0.18)';
+  g.fillRect(0,awY+awH*.72,lbW,awH*.28);
+
+  // ── RIGHT BUILDING — orange-red with cartoon mural ─────────────────────────
+  const rbX=W*.66, rbW=W-rbX;
+  g.fillStyle='#b84020';
+  g.fillRect(rbX,H*.04,rbW,horizon-H*.04);
+  // Edge shading
+  const rbGrad=g.createLinearGradient(rbX,0,W,0);
+  rbGrad.addColorStop(0,'rgba(0,0,0,0.28)'); rbGrad.addColorStop(0.2,'rgba(0,0,0,0)');
+  rbGrad.addColorStop(1,'rgba(0,0,0,0.14)');
+  g.fillStyle=rbGrad; g.fillRect(rbX,H*.04,rbW,horizon-H*.04);
+  // Top shading
+  const rbTop=g.createLinearGradient(0,H*.04,0,H*.16);
+  rbTop.addColorStop(0,'rgba(0,0,0,0.28)'); rbTop.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=rbTop; g.fillRect(rbX,H*.04,rbW,H*.12);
+  // Rooftop
+  g.fillStyle='#9c3818';
+  g.fillRect(rbX,H*.04,rbW,H*.024);
+  // MURAL — big cartoon face (Evoplay style)
+  const mX=rbX+rbW*.06, mY=H*.10, mW=rbW*.88, mH=horizon-H*.23;
+  g.fillStyle='#c84520';
+  g.fillRect(mX,mY,mW,mH);
+  // Mural border
+  g.strokeStyle='rgba(0,0,0,0.20)'; g.lineWidth=2;
+  g.strokeRect(mX,mY,mW,mH);
+  // Big cartoon face — yellow
+  const fcX=mX+mW*.40, fcY=mY+mH*.52, fcR=Math.min(mW,mH)*.32;
+  g.fillStyle='#ffd600';
+  g.beginPath(); g.arc(fcX,fcY,fcR,0,Math.PI*2); g.fill();
+  // Face shadow bottom
+  const faceBot=g.createRadialGradient(fcX,fcY+fcR*.3,fcR*.3,fcX,fcY,fcR);
+  faceBot.addColorStop(0,'rgba(0,0,0,0)'); faceBot.addColorStop(1,'rgba(0,0,0,0.20)');
+  g.fillStyle=faceBot; g.beginPath(); g.arc(fcX,fcY,fcR,0,Math.PI*2); g.fill();
+  // Outline
+  g.strokeStyle='rgba(80,40,0,0.40)'; g.lineWidth=Math.max(2,W*.004);
+  g.beginPath(); g.arc(fcX,fcY,fcR,0,Math.PI*2); g.stroke();
+  // Eyes
+  g.fillStyle='#1a1a1a';
+  g.beginPath(); g.ellipse(fcX-fcR*.38,fcY-fcR*.18,fcR*.17,fcR*.21,-.1,0,Math.PI*2); g.fill();
+  g.beginPath(); g.ellipse(fcX+fcR*.38,fcY-fcR*.18,fcR*.17,fcR*.21,.1,0,Math.PI*2); g.fill();
+  g.fillStyle='rgba(255,255,255,0.65)';
+  g.beginPath(); g.arc(fcX-fcR*.30,fcY-fcR*.27,fcR*.065,0,Math.PI*2); g.fill();
+  g.beginPath(); g.arc(fcX+fcR*.46,fcY-fcR*.27,fcR*.065,0,Math.PI*2); g.fill();
+  // Cheeks
+  g.fillStyle='rgba(255,100,80,0.32)';
+  g.beginPath(); g.ellipse(fcX-fcR*.60,fcY+fcR*.10,fcR*.22,fcR*.14,0,0,Math.PI*2); g.fill();
+  g.beginPath(); g.ellipse(fcX+fcR*.60,fcY+fcR*.10,fcR*.22,fcR*.14,0,0,Math.PI*2); g.fill();
+  // Smile
+  g.strokeStyle='#1a1a1a'; g.lineWidth=Math.max(2,W*.005); g.lineCap='round';
+  g.beginPath(); g.arc(fcX,fcY+fcR*.08,fcR*.44,Math.PI*.16,Math.PI*.84); g.stroke();
+  // Teal abstract blob
+  g.fillStyle='rgba(20,180,220,0.42)';
+  g.beginPath();
+  g.moveTo(mX+mW*.62,mY+mH*.14);
+  g.bezierCurveTo(mX+mW*.82,mY+mH*.08,mX+mW*.96,mY+mH*.28,mX+mW*.88,mY+mH*.50);
+  g.bezierCurveTo(mX+mW*.80,mY+mH*.68,mX+mW*.60,mY+mH*.58,mX+mW*.58,mY+mH*.38);
+  g.closePath(); g.fill();
+  // Yellow star
+  g.fillStyle='rgba(255,220,0,0.60)';
+  const stX=mX+mW*.18, stY=mY+mH*.25, stR=Math.min(mW,mH)*.10;
+  g.beginPath();
+  for(let i=0;i<10;i++){
+    const a=i*Math.PI/5-Math.PI/2; const r=i%2===0?stR:stR*.42;
+    i===0?g.moveTo(stX+Math.cos(a)*r,stY+Math.sin(a)*r):g.lineTo(stX+Math.cos(a)*r,stY+Math.sin(a)*r);
+  }
+  g.closePath(); g.fill();
+  // PLAY text
+  g.fillStyle='rgba(255,255,255,0.50)';
+  g.font=`bold ${Math.round(mH*.16)}px Impact,Arial Black,Arial`;
+  g.textAlign='right'; g.textBaseline='bottom';
+  g.fillText('PLAY',mX+mW*.97,mY+mH*.98);
+  // Blue awning on right building
+  const rawY=horizon-H*.14, rawH=H*.095;
+  const rawStripes=7;
+  for(let ai=0;ai<rawStripes;ai++){
+    const ax=rbX+ai*rbW/rawStripes;
+    g.fillStyle=ai%2===0?'#1565c0':'#1e88e5';
+    g.beginPath();
+    g.moveTo(ax,rawY); g.lineTo(ax+rbW/rawStripes+1,rawY);
+    g.lineTo(ax+rbW/rawStripes+W*.010,rawY+rawH);
+    g.lineTo(ax-W*.010,rawY+rawH);
+    g.closePath(); g.fill();
+  }
+  g.fillStyle='rgba(255,255,255,0.12)';
+  g.fillRect(rbX,rawY,rbW,rawH*.28);
+
+  // ── GRAFFITI WALL — center backdrop behind goal ────────────────────────────
+  const gwX=W*.17, gwW=W*.66, gwY=H*.20, gwH=horizon-gwY+2;
+  // Wall base — purple/lavender like the reference
+  g.fillStyle='#7a58a0';
+  g.fillRect(gwX,gwY,gwW,gwH);
+  // Horizontal gradient for depth
+  const gwGrad=g.createLinearGradient(gwX,0,gwX+gwW,0);
+  gwGrad.addColorStop(0,'rgba(0,0,0,0.20)'); gwGrad.addColorStop(0.12,'rgba(0,0,0,0)');
+  gwGrad.addColorStop(0.88,'rgba(0,0,0,0)'); gwGrad.addColorStop(1,'rgba(0,0,0,0.18)');
+  g.fillStyle=gwGrad; g.fillRect(gwX,gwY,gwW,gwH);
+  // Top edge shadow
+  g.fillStyle='rgba(0,0,0,0.22)'; g.fillRect(gwX,gwY,gwW,3);
+  // ── Graffiti: big smiley face (left of center, lower portion) ──────────────
+  const gsX=gwX+gwW*.25, gsY=gwY+gwH*.62, gsR=gwH*.28;
+  g.fillStyle='#ffd600';
+  g.beginPath(); g.arc(gsX,gsY,gsR,0,Math.PI*2); g.fill();
+  g.strokeStyle='rgba(80,40,0,0.38)'; g.lineWidth=Math.max(1.5,W*.003);
+  g.beginPath(); g.arc(gsX,gsY,gsR,0,Math.PI*2); g.stroke();
+  g.fillStyle='#111';
+  g.beginPath(); g.ellipse(gsX-gsR*.36,gsY-gsR*.18,gsR*.155,gsR*.195,0,0,Math.PI*2); g.fill();
+  g.beginPath(); g.ellipse(gsX+gsR*.36,gsY-gsR*.18,gsR*.155,gsR*.195,0,0,Math.PI*2); g.fill();
+  g.fillStyle='rgba(255,255,255,0.60)';
+  g.beginPath(); g.arc(gsX-gsR*.27,gsY-gsR*.27,gsR*.058,0,Math.PI*2); g.fill();
+  g.beginPath(); g.arc(gsX+gsR*.45,gsY-gsR*.27,gsR*.058,0,Math.PI*2); g.fill();
+  g.strokeStyle='#111'; g.lineWidth=Math.max(1.5,W*.0035); g.lineCap='round';
+  g.beginPath(); g.arc(gsX,gsY+gsR*.06,gsR*.40,Math.PI*.18,Math.PI*.82); g.stroke();
+  // Abstract teal shape on wall (upper center-right)
+  g.fillStyle='rgba(30,190,230,0.45)';
+  g.beginPath();
+  g.moveTo(gwX+gwW*.50,gwY+gwH*.12);
+  g.bezierCurveTo(gwX+gwW*.68,gwY+gwH*.04,gwX+gwW*.86,gwY+gwH*.18,gwX+gwW*.82,gwY+gwH*.48);
+  g.bezierCurveTo(gwX+gwW*.78,gwY+gwH*.68,gwX+gwW*.54,gwY+gwH*.72,gwX+gwW*.48,gwY+gwH*.50);
+  g.closePath(); g.fill();
+  // Orange accent blob (lower right of wall)
+  g.fillStyle='rgba(255,130,0,0.40)';
+  g.beginPath();
+  g.moveTo(gwX+gwW*.60,gwY+gwH*.60);
+  g.lineTo(gwX+gwW*.88,gwY+gwH*.55);
+  g.lineTo(gwX+gwW*.90,gwY+gwH*.94);
+  g.lineTo(gwX+gwW*.58,gwY+gwH*.95);
+  g.closePath(); g.fill();
+  // White graffiti outline star (upper left of wall)
+  g.strokeStyle='rgba(255,255,255,0.38)'; g.lineWidth=Math.max(1,W*.002); g.lineCap='miter';
+  const wstX=gwX+gwW*.14, wstY=gwY+gwH*.28, wstR=gwH*.12;
+  g.beginPath();
+  for(let i=0;i<10;i++){
+    const a=i*Math.PI/5-Math.PI/2; const r=i%2===0?wstR:wstR*.42;
+    i===0?g.moveTo(wstX+Math.cos(a)*r,wstY+Math.sin(a)*r):g.lineTo(wstX+Math.cos(a)*r,wstY+Math.sin(a)*r);
+  }
+  g.closePath(); g.stroke();
+  // Pink graffiti squiggle
+  g.strokeStyle='rgba(255,80,180,0.38)'; g.lineWidth=Math.max(2,W*.004); g.lineCap='round';
+  g.beginPath();
+  g.moveTo(gwX+gwW*.32,gwY+gwH*.22);
+  g.bezierCurveTo(gwX+gwW*.36,gwY+gwH*.12,gwX+gwW*.44,gwY+gwH*.28,gwX+gwW*.40,gwY+gwH*.36);
+  g.bezierCurveTo(gwX+gwW*.36,gwY+gwH*.44,gwX+gwW*.28,gwY+gwH*.42,gwX+gwW*.30,gwY+gwH*.30);
+  g.stroke();
+
+  // ── PALM TREE (center-right, behind goal) ──────────────────────────────────
+  const ptX=W*.58, ptBase=horizon, ptTop=H*.06;
+  const ptTH=ptBase-ptTop;
+  // Trunk
+  const trkG=g.createLinearGradient(ptX-W*.018,0,ptX+W*.018,0);
+  trkG.addColorStop(0,'#5a3515'); trkG.addColorStop(.4,'#8b6535');
+  trkG.addColorStop(.68,'#a07840'); trkG.addColorStop(1,'#5a3010');
+  g.fillStyle=trkG;
+  g.beginPath();
+  g.moveTo(ptX-W*.013,ptBase);
+  g.quadraticCurveTo(ptX-W*.008,ptBase-.55*ptTH, ptX+W*.009,ptTop+ptTH*.28);
+  g.lineTo(ptX+W*.018,ptTop+ptTH*.28);
+  g.quadraticCurveTo(ptX+W*.014,ptBase-.55*ptTH, ptX+W*.016,ptBase);
+  g.closePath(); g.fill();
+  // Trunk rings
+  g.strokeStyle='rgba(40,18,5,0.32)'; g.lineWidth=Math.max(1,W*.0025);
+  for(let ri=0;ri<14;ri++){
+    const ry=ptTop+ptTH*.28+ptTH*.72*ri/14;
+    const rx=ptX+W*.003*(ri*.25);
+    g.beginPath(); g.moveTo(rx-W*.012,ry); g.quadraticCurveTo(rx+W*.002,ry-ptTH*.009,rx+W*.018,ry); g.stroke();
+  }
+  // Fronds — clean arcing strokes, no leaflets
+  const frondTip=[ptX+W*.01, ptTop+ptTH*.28];
+  const fronds=[
+    [-115,0.10,0.05], // drooping left-up
+    [-85, 0.12,0.06], // mostly straight up
+    [-55, 0.16,0.10], // up-left arc
+    [-22, 0.14,0.06], // gentle up-right
+    [ 20, 0.18,0.11], // arcing right
+    [ 55, 0.13,0.14], // drooping right
+  ];
+  const fColors=['#1b5e20','#2e7d32','#388e3c','#43a047'];
+  fronds.forEach(([angDeg,lenFrac,dropFrac],fi)=>{
+    const rad=angDeg*Math.PI/180;
+    const len=W*lenFrac, drop=H*dropFrac;
+    const fx=frondTip[0]+Math.cos(rad)*len, fy=frondTip[1]+Math.sin(rad)*len+drop;
+    const mx=frondTip[0]+Math.cos(rad)*len*.5, my=frondTip[1]+Math.sin(rad)*len*.5+drop*.45;
+    g.strokeStyle=fColors[fi%fColors.length];
+    g.lineWidth=Math.max(3,W*.011); g.lineCap='round';
+    g.beginPath(); g.moveTo(frondTip[0],frondTip[1]); g.quadraticCurveTo(mx,my,fx,fy); g.stroke();
+    // Minimal leaflets: 3 pairs only, short
+    g.lineWidth=Math.max(1.2,W*.0025);
+    for(let li=3;li<=6;li++){
+      const t=li/8;
+      const lx=frondTip[0]*(1-t)+fx*t, ly=frondTip[1]*(1-t)+fy*t;
+      const perp=rad+Math.PI/2;
+      const side=W*(0.018-t*.005);
+      g.beginPath(); g.moveTo(lx,ly); g.lineTo(lx+Math.cos(perp)*side,ly+Math.sin(perp)*side); g.stroke();
+      g.beginPath(); g.moveTo(lx,ly); g.lineTo(lx-Math.cos(perp)*side,ly-Math.sin(perp)*side); g.stroke();
+    }
+  });
+
+  // ── FLAG BUNTING at top ────────────────────────────────────────────────────
+  // String line
+  g.strokeStyle='rgba(140,110,70,0.55)'; g.lineWidth=1.4;
+  g.beginPath(); g.moveTo(0,H*.025); g.quadraticCurveTo(W*.5,H*.008,W,H*.025); g.stroke();
+  // Triangular pennants
+  const pennants=[
+    ['#000','#ffd700','#cc0000'],   // Belgium
+    ['#003399','#cc0000','#fff'],   // Blue/red/white
+    ['#cc0000','#fff',null],        // Red/white
+    ['#009c3b','#ffd700',null],     // Green/yellow (Brazil)
+    ['#003580','#fff',null],        // Blue/white (Finland-ish)
+    ['#cc0000','#006600',null],     // Red/green (Portugal)
+    ['#fff','#000099',null],        // White/blue
+  ];
+  const pCount=pennants.length;
+  pennants.forEach((cols,pi)=>{
+    const px=(pi+0.5)/pCount*W;
+    const pW=W*.05, pH=H*.055;
+    const py=H*.018;
+    // Draw top 2/3 in first color, bottom third in second
+    g.fillStyle=cols[0];
+    g.beginPath(); g.moveTo(px-pW/2,py); g.lineTo(px+pW/2,py); g.lineTo(px,py+pH); g.closePath(); g.fill();
+    if(cols[1]){
+      g.fillStyle=cols[1];
+      g.beginPath(); g.moveTo(px-pW/2,py+pH*.42); g.lineTo(px+pW/2,py+pH*.42); g.lineTo(px,py+pH); g.closePath(); g.fill();
+    }
+    if(cols[2]){
+      g.fillStyle=cols[2];
+      g.beginPath(); g.moveTo(px-pW/2,py+pH*.68); g.lineTo(px+pW/2,py+pH*.68); g.lineTo(px,py+pH); g.closePath(); g.fill();
+    }
+    g.strokeStyle='rgba(0,0,0,0.22)'; g.lineWidth=0.7;
+    g.beginPath(); g.moveTo(px-pW/2,py); g.lineTo(px+pW/2,py); g.lineTo(px,py+pH); g.closePath(); g.stroke();
+  });
+
+  // ── Horizon seam (buildings meet ground) ──────────────────────────────────
+  g.fillStyle='rgba(0,0,0,0.28)'; g.fillRect(0,horizon-2,W,4);
+  const hzSh=g.createLinearGradient(0,horizon,0,horizon+H*.05);
+  hzSh.addColorStop(0,'rgba(0,0,0,0.32)'); hzSh.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=hzSh; g.fillRect(0,horizon,W,H*.05);
+
+  bgCache=o;
+}
+
+function buildGrass(){
+  if(!L.gy2)return;
+  const W=c.width,H=c.height;
+  const o=document.createElement('canvas');o.width=W;o.height=H;
+  const g=o.getContext('2d');
+  const fH=H-L.gy2;
+
+  // ── Green grass pitch ─────────────────────────────────────────────────────
+  const grd=g.createLinearGradient(0,L.gy2,0,H*.84);
+  grd.addColorStop(0,'#3a9e40');
+  grd.addColorStop(.25,'#348c3a');
+  grd.addColorStop(.65,'#2d7a32');
+  grd.addColorStop(1,'#256828');
+  g.fillStyle=grd; g.fillRect(0,L.gy2,W,fH);
+
+  // Mowing stripes (alternating lighter green)
+  for(let i=0;i<16;i++){
+    const t0=Math.pow(i/16,.52), t1=Math.pow((i+1)/16,.52);
+    if(i%2===1){
+      g.fillStyle='rgba(255,255,255,0.048)';
+      g.fillRect(0,L.gy2+fH*t0,W,Math.max(1,fH*(t1-t0)));
+    }
+  }
+
+  // Sun highlight on pitch
+  const sp=g.createRadialGradient(W*.5,H*.78,0,W*.5,H*.82,W*.50);
+  sp.addColorStop(0,'rgba(255,240,160,0.12)'); sp.addColorStop(.45,'rgba(0,0,0,0)'); sp.addColorStop(1,'rgba(0,0,0,0.06)');
+  g.fillStyle=sp; g.fillRect(0,L.gy2,W,fH);
+
+  // ── Red/terracotta running track border at the bottom ─────────────────────
+  const trackY=H*.864, trackH=H*.078;
+  g.fillStyle='#c0392b';
+  g.fillRect(0,trackY,W,H-trackY);
+  // Track inner highlight
+  const trGrad=g.createLinearGradient(0,trackY,0,trackY+trackH);
+  trGrad.addColorStop(0,'rgba(255,255,255,0.08)'); trGrad.addColorStop(.5,'rgba(0,0,0,0)'); trGrad.addColorStop(1,'rgba(0,0,0,0.14)');
+  g.fillStyle=trGrad; g.fillRect(0,trackY,W,trackH);
+  // Track white lane line
+  g.strokeStyle='rgba(255,255,255,0.30)'; g.lineWidth=2;
+  g.beginPath(); g.moveTo(0,trackY+trackH*.5); g.lineTo(W,trackY+trackH*.5); g.stroke();
+  // Grass-to-track transition
+  const gtGrad=g.createLinearGradient(0,trackY-H*.015,0,trackY+H*.015);
+  gtGrad.addColorStop(0,'rgba(0,0,0,0)'); gtGrad.addColorStop(1,'rgba(0,0,0,0.18)');
+  g.fillStyle=gtGrad; g.fillRect(0,trackY-H*.015,W,H*.03);
+
+  grassCache=o;
+}
+
+// ── Game state ─────────────────────────────────────────────────────────────
+const TOTAL=5;
+const gs={shot:0,goals:0,results:[],streak:0,best:0,histCol:new Array(3).fill(0),histRow:new Array(3).fill(0),busy:false,phase:'idle'};
+const A={ballX:0,ballY:0,ballR:0,spin:0,gkX:0,gkY:0,gkAngle:0,flashZone:-1,flashIsGoal:false,flashAlpha:0,hovered:-1,_done:false};
+function initAnim(){ A.ballX=L.bx0;A.ballY=L.by0;A.ballR=L.br0;A.gkX=L.gx1+L.gw*.5;A.gkY=0;A.gkAngle=0;A.flashZone=-1;A.flashAlpha=0; }
+
+function aiPickCol(){
+  const s=gs.histCol.reduce((a,b)=>a+b,0);
+  if(s<3||Math.random()>.55)return Math.floor(Math.random()*3);
+  let r=Math.random()*s;
+  for(let i=0;i<3;i++){r-=gs.histCol[i];if(r<=0)return i;}
+  return 0;
+}
+function aiPickRow(){
+  const hi=gs.histRow[0], lo=gs.histRow[1]+gs.histRow[2];
+  const total=hi+lo;
+  if(total<3) return Math.random()<0.42?0:1;
+  if(Math.random()<0.60) return hi>lo?0:1;
+  return Math.random()<0.42?0:1;
+}
+function zoneRect(z){const c2=z%3,r=Math.floor(z/3);return{x:L.gx1+c2*L.gw/3,y:L.gy1+r*L.gh/3,w:L.gw/3,h:L.gh/3};}
+function zoneCenter(z){const r=zoneRect(z);return{x:r.x+r.w/2,y:r.y+r.h/2};}
+function zoneAt(mx,my){if(mx<L.gx1||mx>L.gx2||my<L.gy1||my>L.gy2)return -1;return Math.min(Math.floor((my-L.gy1)/L.gh*3),2)*3+Math.min(Math.floor((mx-L.gx1)/L.gw*3),2);}
+function lerp(a,b,t){return a+(b-a)*t;}
+
+function shoot(pz){
+  if(gs.busy||gs.phase!=='idle'||gs.shot>=TOTAL)return;
+  gs.busy=true;
+  const pzCol=pz%3, pzRow=Math.floor(pz/3);
+  gs.histCol[pzCol]++;gs.histRow[pzRow]++;
+  const gkCol=aiPickCol(), gkRow=aiPickRow();
+  let isGoal;
+  if(gkCol!==pzCol)             isGoal=true;
+  else if(pzRow===1)            isGoal=false;
+  else if(pzRow===0&&gkRow===0) isGoal=false;
+  else if(pzRow===2&&gkRow===1) isGoal=false;
+  else                          isGoal=true;
+  const target=zoneCenter(pz);
+  const sx=L.bx0,sy=L.by0,sr=L.br0;
+  // Dive sprite is 440×320 (aspect 1.375) at gh*0.82 → width = gh*1.127
+  // Half-width as fraction of goal width: gkW/2/gw = gh*0.5635/gw
+  // Constrain dive target so sprite edge stays inside goal posts
+  const diveHalfW=L.gh*0.82*1.375*0.5;
+  const diveLeftFrac=Math.max(0.20, diveHalfW/L.gw);
+  const diveRightFrac=Math.min(0.80, 1-diveHalfW/L.gw);
+  const gkTX=gkCol===0?L.gx1+L.gw*diveLeftFrac:gkCol===2?L.gx1+L.gw*diveRightFrac:L.gx1+L.gw*.5;
+  // Up sprite at gh*1.02 has feet anchor at gh*1.02*0.82 = 0.836 from top
+  // Max upward gkY (body top at gy1): -gh*(1-1.02*0.82) = -gh*0.164
+  const gkTY=gkRow===0?-L.gh*.13:0;
+  const gkTA=gkCol===0?-36:gkCol===2?36:0;
+  const gkSX=A.gkX,gkSY=A.gkY;
+  gs.phase='flying';document.getElementById('aimHint').style.display='none';A._done=false;
+  let t0=null;const FLY=480,GKD=85,RES=520,RST=1600;
+  function step(ts){
+    if(!t0)t0=ts;const e=ts-t0;
+    const bt=Math.min(e/FLY,1),be=1-(1-bt)**2;
+    A.ballX=lerp(sx,target.x,be);A.ballY=lerp(sy,target.y,be);A.ballR=lerp(sr,sr*.45,be);A.spin+=.12;
+    if(e>GKD){const gt=Math.min((e-GKD)/(FLY-GKD),1),ge=1-(1-gt)**2;
+      A.gkX=lerp(gkSX,gkTX,ge);A.gkY=lerp(gkSY,gkTY,ge);A.gkAngle=lerp(0,gkTA,ge);}
+    if(e>=RES){A.flashZone=pz;A.flashIsGoal=isGoal;A.flashAlpha=Math.min((e-RES)/150,1);}
+    if(e>=RES&&!A._done){
+      A._done=true;
+      if(isGoal){gs.goals++;gs.streak++;if(gs.streak>gs.best)gs.best=gs.streak;showMsg('⚽  进球！','#ffeb3b');document.getElementById('streakBadge').textContent=gs.streak>=3?`🔥 ${gs.streak} 连击！`:'';}
+      else{gs.streak=0;showMsg('🙅  被扑出！','#ff6060');document.getElementById('streakBadge').textContent='';}
+      gs.results.push(isGoal?'goal':'miss');gs.shot++;renderPips();renderHUD();
+    }
+    if(e>=RST){
+      A.flashZone=-1;A.flashAlpha=0;A._done=false;
+      A.gkX=L.gx1+L.gw*.5;A.gkY=0;A.gkAngle=0;
+      A.ballX=L.bx0;A.ballY=L.by0;A.ballR=L.br0;
+      hideMsg();gs.phase='idle';gs.busy=false;
+      if(gs.shot>=TOTAL)setTimeout(showResult,200);else document.getElementById('aimHint').style.display='';
+      return;
+    }
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// ── Draw helpers ───────────────────────────────────────────────────────────
+function rr(ctx,x,y,w,h,r){
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();
+}
+
+// ── Draw: field ────────────────────────────────────────────────────────────
+function drawField(){
+  const{W,H,gy2,gx1,gx2,gw,vpX}=L,fH=H-gy2;
+  // Skip canvas-drawn grass when custom bg.png is loaded (bg already contains pitch)
+  if(!img.bg && grassCache)ctx.drawImage(grassCache,0,0);
+  ctx.strokeStyle='rgba(255,255,255,0.52)';ctx.lineWidth=2.2;
+  ctx.beginPath();ctx.moveTo(0,gy2);ctx.lineTo(W,gy2);ctx.stroke();
+  const paL=gx1-gw*.08,paR=gx2+gw*.08,sp=2.2;
+  const bL=vpX+(paL-vpX)*sp,bR=vpX+(paR-vpX)*sp;
+  const nt=.38,ny=gy2+fH*nt,nL=lerp(paL,bL,nt),nR=lerp(paR,bR,nt);
+  ctx.strokeStyle='rgba(255,255,255,0.45)';ctx.lineWidth=1.8;
+  ctx.beginPath();ctx.moveTo(paL,gy2);ctx.lineTo(bL,H*.86);ctx.moveTo(paR,gy2);ctx.lineTo(bR,H*.86);ctx.moveTo(nL,ny);ctx.lineTo(nR,ny);ctx.stroke();
+  if(!img.bg){ctx.fillStyle='rgba(255,255,255,0.75)';
+  ctx.beginPath();ctx.arc(vpX,gy2+fH*.08,5.5,0,Math.PI*2);ctx.fill();}
+}
+
+// ── Draw: goal back (transparent — shows graffiti wall through net) ─────────
+function drawGoalBack(){
+  const{gx1,gx2,gy1,gy2,gw,gh}=L;
+  const dep=gw*.055,bx1=gx1+dep,bx2=gx2-dep,by1=gy1+dep*.40,by2=gy2-dep*.06;
+  // Subtle depth shadow — no opaque fill
+  const depG=ctx.createLinearGradient(0,gy1,0,gy2);
+  depG.addColorStop(0,'rgba(0,0,0,0.40)');
+  depG.addColorStop(.45,'rgba(0,0,0,0.22)');
+  depG.addColorStop(1,'rgba(0,0,0,0.05)');
+  ctx.fillStyle=depG; ctx.fillRect(gx1,gy1,gw,gh);
+  // Back wall shadow
+  ctx.fillStyle='rgba(0,0,0,0.24)';
+  ctx.beginPath();ctx.moveTo(bx1,by1);ctx.lineTo(bx2,by1);ctx.lineTo(bx2,by2);ctx.lineTo(bx1,by2);ctx.closePath();ctx.fill();
+  // Corner depth lines
+  ctx.strokeStyle='rgba(255,255,255,0.55)';ctx.lineWidth=1.5;
+  [[gx1,gy1,bx1,by1],[gx2,gy1,bx2,by1],[gx1,gy2,bx1,by2],[gx2,gy2,bx2,by2]].forEach(([ax,ay,ex,ey])=>{ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(ex,ey);ctx.stroke();});
+  // Side net lines
+  ctx.strokeStyle='rgba(255,255,255,0.28)';ctx.lineWidth=0.7;
+  for(let i=1;i<6;i++){
+    const t=i/6,fy=gy1+(gy2-gy1)*t,by=by1+(by2-by1)*t;
+    ctx.beginPath();ctx.moveTo(gx1,fy);ctx.lineTo(bx1,by);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(gx2,fy);ctx.lineTo(bx2,by);ctx.stroke();
+  }
+  for(let i=1;i<5;i++){
+    const t=i/5,fx=gx1+gw*t,bx=bx1+(bx2-bx1)*t;
+    ctx.beginPath();ctx.moveTo(fx,gy1);ctx.lineTo(bx,by1);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(fx,gy2);ctx.lineTo(bx,by2);ctx.stroke();
+  }
+  // Back wall grid
+  ctx.strokeStyle='rgba(255,255,255,0.24)';ctx.lineWidth=0.55;
+  for(let i=0;i<=7;i++){
+    const y=by1+(i/7)*(by2-by1);ctx.beginPath();ctx.moveTo(bx1,y);ctx.lineTo(bx2,y);ctx.stroke();
+    const x=bx1+(i/7)*(bx2-bx1);ctx.beginPath();ctx.moveTo(x,by1);ctx.lineTo(x,by2);ctx.stroke();
+  }
+}
+
+// ── Draw: goal front net ───────────────────────────────────────────────────
+function drawGoalFront(){
+  const{gx1,gx2,gy1,gy2,gw,gh}=L;
+  ctx.strokeStyle='rgba(255,255,255,0.38)';ctx.lineWidth=0.8;
+  for(let i=0;i<=10;i++){const y=gy1+(i/10)*gh;ctx.beginPath();ctx.moveTo(gx1,y);ctx.lineTo(gx2,y);ctx.stroke();}
+  for(let i=0;i<=18;i++){const x=gx1+(i/18)*gw;ctx.beginPath();ctx.moveTo(x,gy1);ctx.lineTo(x,gy2);ctx.stroke();}
+}
+
+// ── Draw: goal posts — white metallic (like the reference) ────────────────
+function drawGoalPosts(){
+  const{gx1,gx2,gy1,gy2}=L,pw=14,sh=5;
+  ctx.fillStyle='rgba(0,0,0,0.28)';
+  ctx.fillRect(gx1-pw/2+sh,gy1+sh,pw,gy2-gy1);
+  ctx.fillRect(gx2-pw/2+sh,gy1+sh,pw,gy2-gy1);
+  ctx.fillRect(gx1-pw/2+sh,gy1+sh,gx2-gx1+pw,pw);
+  function post(x,y,w,h){
+    const gl=ctx.createLinearGradient(x,0,x+w,0);
+    gl.addColorStop(0,'#888');gl.addColorStop(.18,'#d8d8d8');gl.addColorStop(.36,'#f4f4f4');
+    gl.addColorStop(.50,'#ffffff');gl.addColorStop(.64,'#f0f0f0');gl.addColorStop(.82,'#d0d0d0');gl.addColorStop(1,'#909090');
+    ctx.fillStyle=gl;ctx.fillRect(x,y,w,h);
+  }
+  function crossbar(x,y,w,h){
+    const gl=ctx.createLinearGradient(0,y,0,y+h);
+    gl.addColorStop(0,'#888');gl.addColorStop(.22,'#d8d8d8');gl.addColorStop(.46,'#f8f8f8');
+    gl.addColorStop(.54,'#ffffff');gl.addColorStop(.78,'#d0d0d0');gl.addColorStop(1,'#909090');
+    ctx.fillStyle=gl;ctx.fillRect(x,y,w,h);
+  }
+  post(gx1-pw/2,gy1,pw,gy2-gy1);
+  post(gx2-pw/2,gy1,pw,gy2-gy1);
+  crossbar(gx1-pw/2,gy1,gx2-gx1+pw,pw);
+  // End caps
+  ctx.fillStyle='#bbb';
+  ctx.beginPath();ctx.arc(gx1,gy2,pw/2,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(gx2,gy2,pw/2,0,Math.PI*2);ctx.fill();
+}
+
+// ── Draw: goalkeeper — image-aware ────────────────────────────────────────
+function drawGK(){
+  // Pick which sprite to use based on animation state
+  let sp=null;
+  if(img.gk_idle||img.gk_left||img.gk_right||img.gk_up){
+    if(Math.abs(A.gkAngle)>8)
+      sp=A.gkAngle<0?(img.gk_left||img.gk_idle):(img.gk_right||img.gk_idle);
+    else if(A.gkY<-L.gh*.08)
+      sp=img.gk_up||img.gk_idle;
+    else
+      sp=img.gk_idle;
+  }
+  if(sp){
+    // Different size per pose: idle stays big, dive/up shrink so they fit inside goal
+    let gkHRatio=1.20;
+    if(sp===img.gk_left||sp===img.gk_right) gkHRatio=0.82;
+    else if(sp===img.gk_up) gkHRatio=1.02;
+    const gkH=L.gh*gkHRatio, gkW=gkH*sp.width/sp.height;
+    ctx.save();
+    ctx.translate(A.gkX, L.gy2+A.gkY);
+    ctx.rotate(A.gkAngle*Math.PI/180);
+    // Ground shadow
+    ctx.fillStyle='rgba(0,0,0,0.22)';
+    ctx.beginPath();ctx.ellipse(0,0,gkW*.38,gkH*.04,0,0,Math.PI*2);ctx.fill();
+    // Sprites have ~18% transparent padding below the feet.
+    // Shift draw up so the feet (at ~82% of image height) land at anchor (y=0).
+    ctx.drawImage(sp,-gkW/2,-gkH*0.82,gkW,gkH);
+    ctx.restore();
+    return;
+  }
+  drawGKCanvas(); // fallback
+}
+
+// ── Draw: goalkeeper canvas fallback ──────────────────────────────────────
+function drawGKCanvas(){
+  const sc=L.gh*.63/110, lw=1/sc;
+  ctx.save();ctx.translate(A.gkX,L.gy2+A.gkY);ctx.rotate(A.gkAngle*Math.PI/180);ctx.scale(sc,sc);
+  // Shadow
+  const gsh=ctx.createRadialGradient(0,-1,1,0,-1,34);
+  gsh.addColorStop(0,'rgba(0,0,0,0.55)');gsh.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=gsh;ctx.beginPath();ctx.ellipse(0,-1,34,9,0,0,Math.PI*2);ctx.fill();
+  // Boots (dark blue/black)
+  function boot(bx){
+    ctx.save();ctx.translate(bx,0);
+    ctx.fillStyle='#0d0d2a';ctx.beginPath();ctx.ellipse(6,-2,8.5,2.5,0,0,Math.PI*2);ctx.fill();
+    const bg=ctx.createLinearGradient(0,-14,14,-5);
+    bg.addColorStop(0,'#0a0a22');bg.addColorStop(.45,'#14143a');bg.addColorStop(1,'#08081a');
+    ctx.fillStyle=bg;ctx.beginPath();rr(ctx,0,-14,14,12,3);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.10)';ctx.fillRect(2,-12,4,5);
+    ctx.restore();
+  }
+  boot(-15);boot(2);
+  // Socks (white)
+  function sock(sx){
+    const sg=ctx.createLinearGradient(sx,0,sx+12,0);
+    sg.addColorStop(0,'#c8c8c8');sg.addColorStop(.5,'#f0f0f0');sg.addColorStop(1,'#b8b8b8');
+    ctx.fillStyle=sg;ctx.fillRect(sx,-32,12,20);
+    ctx.fillStyle='rgba(20,20,100,.22)';ctx.fillRect(sx,-32,12,5);
+  }
+  sock(-14);sock(3);
+  // Shorts (dark navy blue)
+  const shg=ctx.createLinearGradient(-16,-54,16,-36);
+  shg.addColorStop(0,'#0d2a6e');shg.addColorStop(.5,'#103280');shg.addColorStop(1,'#0a2060');
+  ctx.fillStyle=shg;
+  ctx.beginPath();ctx.moveTo(-14,-36);ctx.lineTo(-15,-54);ctx.lineTo(-2,-54);ctx.lineTo(0,-45);ctx.lineTo(2,-54);ctx.lineTo(15,-54);ctx.lineTo(14,-36);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.06)';ctx.fillRect(-14,-54,7,18);
+  // Jersey — bright blue (like Evoplay's GK)
+  const jg=ctx.createLinearGradient(-14,-90,14,-54);
+  jg.addColorStop(0,'#42a5f5');jg.addColorStop(.28,'#1e88e5');jg.addColorStop(.68,'#1565c0');jg.addColorStop(1,'#0d47a1');
+  ctx.fillStyle=jg;
+  ctx.beginPath();
+  ctx.moveTo(-13,-54);ctx.bezierCurveTo(-14,-66,-14,-78,-13,-90);
+  ctx.lineTo(13,-90);ctx.bezierCurveTo(14,-78,14,-66,13,-54);
+  ctx.closePath();ctx.fill();
+  // Jersey highlight
+  const jhl=ctx.createLinearGradient(-9,-90,0,-54);
+  jhl.addColorStop(0,'rgba(255,255,255,.32)');jhl.addColorStop(.55,'rgba(255,255,255,.10)');jhl.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=jhl;
+  ctx.beginPath();ctx.moveTo(-13,-54);ctx.bezierCurveTo(-14,-66,-14,-78,-13,-90);ctx.lineTo(0,-90);ctx.lineTo(0,-54);ctx.closePath();ctx.fill();
+  // Jersey shadow right
+  const jsh=ctx.createLinearGradient(4,-90,13,-54);
+  jsh.addColorStop(0,'rgba(0,0,0,0)');jsh.addColorStop(1,'rgba(0,0,0,.30)');
+  ctx.fillStyle=jsh;
+  ctx.beginPath();ctx.moveTo(0,-54);ctx.lineTo(0,-90);ctx.lineTo(13,-90);ctx.bezierCurveTo(14,-78,14,-66,13,-54);ctx.closePath();ctx.fill();
+  // White stripe
+  ctx.fillStyle='rgba(255,255,255,.16)';ctx.fillRect(-13,-76,26,5);
+  // V-collar white
+  ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=1.5*lw;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(-5,-90);ctx.lineTo(0,-83);ctx.lineTo(5,-90);ctx.stroke();
+  // Number
+  ctx.fillStyle='rgba(255,255,255,.88)';ctx.font=`bold ${Math.round(15*lw)}px Arial`;
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('1',0,-71);
+  // Arms
+  function drawArm(x0,y0,xE,yE,xW,yW){
+    const ag=ctx.createLinearGradient(x0,y0,xW,yW);
+    ag.addColorStop(0,'#1a80d8');ag.addColorStop(.5,'#2196f3');ag.addColorStop(1,'#1060c0');
+    ctx.strokeStyle=ag;ctx.lineWidth=8*lw;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(x0,y0);ctx.quadraticCurveTo((x0+xE)*.5,(y0+yE)*.5-6,xE,yE);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(xE,yE);ctx.quadraticCurveTo((xE+xW)*.5,(yE+yW)*.5-4,xW,yW);ctx.stroke();
+  }
+  drawArm(-13,-84,-27,-68,-40,-54);
+  drawArm( 13,-84, 27,-68, 40,-54);
+  // Gloves (yellow/gold — classic GK gloves)
+  function glove(gx,gy,isLeft){
+    ctx.save();ctx.translate(gx,gy);ctx.rotate(isLeft?-.20:.20);
+    const gg=ctx.createLinearGradient(-11,-6,11,10);
+    gg.addColorStop(0,'#f5c800');gg.addColorStop(.35,'#d4a800');gg.addColorStop(1,'#a07800');
+    ctx.fillStyle=gg;ctx.beginPath();rr(ctx,-11,-6,22,14,3.5);ctx.fill();
+    ctx.strokeStyle='rgba(80,50,0,.40)';ctx.lineWidth=.9*lw;
+    for(let fi=0;fi<3;fi++){ctx.beginPath();ctx.moveTo(-9,-2+fi*4);ctx.lineTo(9,-2+fi*4);ctx.stroke();}
+    const fg=ctx.createLinearGradient(-9,1,9,11);
+    fg.addColorStop(0,'rgba(255,220,80,.42)');fg.addColorStop(1,'rgba(255,180,0,.14)');
+    ctx.fillStyle=fg;ctx.beginPath();rr(ctx,-8,1,16,10,2.5);ctx.fill();
+    ctx.fillStyle='#c89800';ctx.beginPath();ctx.ellipse(isLeft?-12:11,1,4.5,3.8,isLeft?-.3:.3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,240,150,.42)';ctx.beginPath();ctx.ellipse(-2,-2,4.5,2,0,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  glove(-40,-54,true);glove(40,-54,false);
+  // Neck
+  ctx.fillStyle='#cf9a60';ctx.fillRect(-4,-97,8,8);
+  // Head
+  const hg=ctx.createRadialGradient(-4,-108,3,0,-104,12.5);
+  hg.addColorStop(0,'#fde4ae');hg.addColorStop(.6,'#f5c172');hg.addColorStop(1,'#a86c32');
+  ctx.fillStyle=hg;ctx.beginPath();ctx.arc(0,-104,12,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(100,50,8,.14)';ctx.beginPath();ctx.ellipse(0,-100,10,5,0,0,Math.PI);ctx.fill();
+  // Hair (short, dark)
+  const hrg=ctx.createRadialGradient(-2,-115,1,0,-108,14);
+  hrg.addColorStop(0,'#4a2208');hrg.addColorStop(1,'#180800');
+  ctx.fillStyle=hrg;ctx.beginPath();ctx.ellipse(0,-113,12,8.5,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#280e02';ctx.beginPath();ctx.ellipse(-1,-106,11,5,-.15,Math.PI*.06,Math.PI*.94);ctx.fill();
+  // Eyebrows
+  ctx.strokeStyle='#5a2c0c';ctx.lineWidth=1.4*lw;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(-7.5,-104.5);ctx.quadraticCurveTo(-4.5,-103.4,-1,-104);ctx.stroke();
+  ctx.beginPath();ctx.moveTo( 7.5,-104.5);ctx.quadraticCurveTo( 4.5,-103.4, 1,-104);ctx.stroke();
+  // Eyes
+  ctx.fillStyle='#fff';
+  ctx.beginPath();ctx.ellipse(-5,-101.5,3,2.1,-.08,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse( 5,-101.5,3,2.1, .08,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#201000';
+  ctx.beginPath();ctx.arc(-5,-101.5,1.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc( 5,-101.5,1.5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.90)';
+  ctx.beginPath();ctx.arc(-4.2,-102.2,.85,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc( 5.8,-102.2,.85,0,Math.PI*2);ctx.fill();
+  // Nose
+  ctx.strokeStyle='rgba(138,68,24,.55)';ctx.lineWidth=1*lw;
+  ctx.beginPath();ctx.moveTo(0,-98.5);ctx.lineTo(-1.6,-96.4);ctx.moveTo(0,-98.5);ctx.lineTo(1.6,-96.4);ctx.stroke();
+  ctx.beginPath();ctx.arc(-1.6,-96.4,1.3,Math.PI,0);ctx.arc(1.6,-96.4,1.3,Math.PI,0);ctx.stroke();
+  // Mouth
+  ctx.strokeStyle='rgba(136,52,34,.80)';ctx.lineWidth=1.4*lw;
+  ctx.beginPath();ctx.moveTo(-3.6,-93.5);ctx.quadraticCurveTo(0,-92,3.6,-93.5);ctx.stroke();
+  ctx.restore();
+}
+
+// ── Draw: ball — image-aware ───────────────────────────────────────────────
+function drawBall(){
+  const x=A.ballX,y=A.ballY,r=A.ballR;
+  // Shadow (always)
+  ctx.fillStyle='rgba(0,0,0,0.25)';
+  ctx.beginPath();ctx.ellipse(x,y+r*.88,r*.72,r*.20,0,0,Math.PI*2);ctx.fill();
+  if(img.ball){
+    ctx.save();ctx.translate(x,y);ctx.rotate(A.spin);
+    // Maintain aspect ratio — AI-generated images are often 1536×1024 (3:2), not square
+    const bAR=img.ball.naturalWidth/img.ball.naturalHeight;
+    const bW=r*2*Math.max(1,bAR), bH=r*2*Math.max(1,1/bAR);
+    ctx.drawImage(img.ball,-bW/2,-bH/2,bW,bH);
+    ctx.restore();
+    return;
+  }
+  drawBallCanvas();
+}
+function drawBallCanvas(){
+  const x=A.ballX,y=A.ballY,r=A.ballR;
+  ctx.save();ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.clip();
+  const bg=ctx.createRadialGradient(x-r*.32,y-r*.32,r*.04,x,y,r);
+  bg.addColorStop(0,'#fff');bg.addColorStop(.42,'#e0e0e0');bg.addColorStop(1,'#707070');
+  ctx.fillStyle=bg;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#1a1a1a';
+  function pent(cx,cy,pr,sp){ctx.beginPath();for(let i=0;i<5;i++){const a=i*Math.PI*2/5-Math.PI/2+sp;i===0?ctx.moveTo(cx+Math.cos(a)*pr,cy+Math.sin(a)*pr):ctx.lineTo(cx+Math.cos(a)*pr,cy+Math.sin(a)*pr);}ctx.closePath();ctx.fill();}
+  pent(x,y,r*.23,A.spin);
+  for(let i=0;i<5;i++){const a=i*Math.PI*2/5-Math.PI/2+A.spin*.4;pent(x+Math.cos(a)*r*.53,y+Math.sin(a)*r*.53,r*.23,A.spin+i);}
+  const sh=ctx.createRadialGradient(x-r*.28,y-r*.33,0,x,y,r);
+  sh.addColorStop(0,'rgba(255,255,255,0.65)');sh.addColorStop(.45,'rgba(255,255,255,0.10)');sh.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=sh;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+}
+
+// ── Draw: zones ────────────────────────────────────────────────────────────
+function drawZones(){
+  if(A.hovered>=0&&gs.phase==='idle'){
+    const{gx1,gx2,gy1,gy2,gw,gh}=L;
+    ctx.strokeStyle='rgba(255,255,100,0.30)';ctx.lineWidth=1;ctx.setLineDash([3,4]);
+    for(let i=1;i<3;i++){ctx.beginPath();ctx.moveTo(gx1+gw/3*i,gy1);ctx.lineTo(gx1+gw/3*i,gy2);ctx.stroke();ctx.beginPath();ctx.moveTo(gx1,gy1+gh/3*i);ctx.lineTo(gx2,gy1+gh/3*i);ctx.stroke();}
+    ctx.setLineDash([]);
+    const rz=zoneRect(A.hovered);
+    ctx.fillStyle='rgba(255,255,100,0.16)';ctx.fillRect(rz.x,rz.y,rz.w,rz.h);
+    const cx2=rz.x+rz.w/2,cy2=rz.y+rz.h/2,cr=Math.min(rz.w,rz.h)*.25;
+    ctx.strokeStyle='rgba(255,255,100,0.95)';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(cx2,cy2,cr,0,Math.PI*2);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx2-cr*1.5,cy2);ctx.lineTo(cx2-cr*.6,cy2);ctx.moveTo(cx2+cr*.6,cy2);ctx.lineTo(cx2+cr*1.5,cy2);ctx.moveTo(cx2,cy2-cr*1.5);ctx.lineTo(cx2,cy2-cr*.6);ctx.moveTo(cx2,cy2+cr*.6);ctx.lineTo(cx2,cy2+cr*1.5);ctx.stroke();
+  }
+  if(A.flashZone>=0&&A.flashAlpha>0){
+    const rz=zoneRect(A.flashZone);
+    ctx.fillStyle=A.flashIsGoal?`rgba(0,230,118,${A.flashAlpha*.55})`:`rgba(255,50,50,${A.flashAlpha*.55})`;
+    ctx.fillRect(rz.x,rz.y,rz.w,rz.h);
+  }
+}
+
+// ── Post-processing: gentle outdoor vignette ───────────────────────────────
+function drawVignette(){
+  const{W,H}=L;
+  const vg=ctx.createRadialGradient(W*.5,H*.46,H*.22,W*.5,H*.50,H*.74);
+  vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(.70,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,0.36)');
+  ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
+}
+
+// ── Render loop ────────────────────────────────────────────────────────────
+function draw(){
+  // Background: custom image > canvas-built cache
+  if(img.bg){
+    // Cover-fit: scale uniformly to fill canvas, center-crop (preserves aspect ratio)
+    const s=Math.max(L.W/img.bg.naturalWidth, L.H/img.bg.naturalHeight);
+    const dw=img.bg.naturalWidth*s, dh=img.bg.naturalHeight*s;
+    ctx.drawImage(img.bg,(L.W-dw)/2,(L.H-dh)/2,dw,dh);
+  } else if(bgCache) ctx.drawImage(bgCache,0,0);
+  // bg.png already contains the pitch, goal, net, and field markings —
+  // skip all canvas-drawn duplicates when the custom background is loaded
+  if(!img.bg) drawField();
+  if(!img.bg) drawGoalBack();
+  drawGK();
+  if(!img.bg) drawGoalFront();
+  if(!img.bg) drawGoalPosts();
+  drawZones();
+  drawBall();
+  drawVignette();
+  requestAnimationFrame(draw);
+}
+
+// ── UI ─────────────────────────────────────────────────────────────────────
+function showMsg(t,c2){const el=document.getElementById('statusMsg');el.textContent=t;el.style.color=c2;el.classList.add('show');}
+function hideMsg(){document.getElementById('statusMsg').classList.remove('show');}
+function renderPips(){document.getElementById('pips').innerHTML=Array.from({length:TOTAL},(_,i)=>`<div class="pip ${i<gs.results.length?gs.results[i]:''}"></div>`).join('');document.getElementById('shotLabel').textContent=gs.shot<TOTAL?`第 ${gs.shot+1} / ${TOTAL} 球`:''; }
+function renderHUD(){document.getElementById('hGoals').textContent=gs.goals;document.getElementById('hStreak').textContent=gs.streak;document.getElementById('hBest').textContent=gs.best;}
+function showResult(){
+  const g=gs.goals,[e,t,f]=g===5?['🏆','完美罚球！','守门员完全被你读穿了']:g>=4?['🎉','非常出色！','射门技术一流']:g>=3?['👍','不错！','再练练能更厉害']:g>=2?['😅','还需加油','守门员今天状态很好']:['😭','被守门员统治','下次一定！加油！'];
+  document.getElementById('mEmoji').textContent=e;document.getElementById('mTitle').textContent=t;document.getElementById('mScore').textContent=`${g} / ${TOTAL} 球进网`;document.getElementById('mFlavor').textContent=f;document.getElementById('overlay').classList.add('open');
+}
+function restart(){
+  gs.shot=0;gs.goals=0;gs.results=[];gs.streak=0;gs.busy=false;gs.phase='idle';
+  gs.histCol=[0,0,0];gs.histRow=[0,0,0];
+  document.getElementById('overlay').classList.remove('open');document.getElementById('streakBadge').textContent='';document.getElementById('aimHint').style.display='';
+  hideMsg();initAnim();renderPips();renderHUD();
+}
+
+// ── Input ──────────────────────────────────────────────────────────────────
+c.addEventListener('mousemove',e=>{const r=c.getBoundingClientRect(),mx=(e.clientX-r.left)*c.width/r.width,my=(e.clientY-r.top)*c.height/r.height;A.hovered=gs.phase==='idle'?zoneAt(mx,my):-1;c.style.cursor=(A.hovered>=0&&gs.phase==='idle')?'crosshair':'default';});
+c.addEventListener('click',e=>{if(gs.phase!=='idle')return;const r=c.getBoundingClientRect(),mx=(e.clientX-r.left)*c.width/r.width,my=(e.clientY-r.top)*c.height/r.height;const z=zoneAt(mx,my);if(z>=0)shoot(z);});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+function resize(){
+  c.width=window.innerWidth;c.height=window.innerHeight;
+  computeLayout();buildBG();buildGrass();initAnim();
+}
+window.addEventListener('resize',resize);
+
+// ── Background music ──────────────────────────────────────────────────────
+// Drop your MP3 at  assets/bgm.mp3  (e.g. World Cup theme song you legally own).
+// If the file is missing the button just stays muted — the game still works.
+const bgm=document.getElementById('bgm'), musicBtn=document.getElementById('musicBtn');
+let bgmOn=false, bgmReady=false;
+bgm.volume=0.45;
+bgm.addEventListener('canplay',()=>{bgmReady=true;});
+bgm.addEventListener('error',()=>{musicBtn.style.opacity='0.35';musicBtn.title='assets/bgm.mp3 未找到';});
+function toggleBGM(){
+  if(!bgmReady && bgm.error){return;}
+  if(bgmOn){bgm.pause();musicBtn.textContent='🔇';bgmOn=false;}
+  else{bgm.play().then(()=>{musicBtn.textContent='🔊';bgmOn=true;}).catch(()=>{});}
+}
+musicBtn.addEventListener('click',toggleBGM);
+// Browsers block autoplay until user interacts — start music on first click anywhere
+function autoStartOnce(){
+  if(!bgmOn && bgmReady && !bgm.error){
+    bgm.play().then(()=>{musicBtn.textContent='🔊';bgmOn=true;}).catch(()=>{});
+  }
+  document.removeEventListener('click',autoStartOnce);
+  document.removeEventListener('touchstart',autoStartOnce);
+}
+document.addEventListener('click',autoStartOnce);
+document.addEventListener('touchstart',autoStartOnce);
+
+// Load assets first, then start game
+loadAssets(()=>{
+  const ls=document.getElementById('loadScreen');
+  if(ls)ls.classList.add('hidden');
+  resize();renderPips();renderHUD();draw();
+});
+</script>
+</body>
+</html>

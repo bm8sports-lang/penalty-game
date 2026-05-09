@@ -1,0 +1,13 @@
+# Audio with potential copyright (uncomment to commit)
+assets/bgm.mp3
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.claude/
+.vscode/
+*.log
+
+# Temporary screenshots
+check_*.jpg
+screenshot*.jpg

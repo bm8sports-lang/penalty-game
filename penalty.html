@@ -588,7 +588,7 @@ function shoot(pz){
   const isTopCorner=gkRow===0 && gkCol!==1;
   const gkTY=isTopCorner ? -L.gh*0.42 : (gkRow===0 ? -L.gh*0.22 : 0);
   const baseAng=gkCol===0?-36:gkCol===2?36:0;
-  const gkTA=isTopCorner ? Math.sign(baseAng)*55 : baseAng;
+  const gkTA=isTopCorner ? Math.sign(baseAng)*30 : baseAng;
   const gkSX=A.gkX,gkSY=A.gkY;
   gs.phase='flying';document.getElementById('aimHint').style.display='none';A._done=false;
   let t0=null;const FLY=480,GKD=85,RES=520,RST=1600;

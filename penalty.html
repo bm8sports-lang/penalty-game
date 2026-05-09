@@ -561,16 +561,16 @@ function shoot(pz){
   gs.histCol[pzCol]++;gs.histRow[pzRow]++;
   let gkCol,gkRow,isGoal;
   if(Math.random()<0.85){
-    // 85% goal: GK dives wrong column
+    // 85% save: GK dives correct column and matching row
+    gkCol=pzCol;
+    gkRow=pzRow===0?0:1;
+    isGoal=false;
+  }else{
+    // 15% goal: GK dives wrong column
     const wrong=[0,1,2].filter(c=>c!==pzCol);
     gkCol=wrong[Math.floor(Math.random()*wrong.length)];
     gkRow=Math.random()<0.5?0:1;
     isGoal=true;
-  }else{
-    // 15% save: GK dives correct column and matching row
-    gkCol=pzCol;
-    gkRow=pzRow===0?0:1;
-    isGoal=false;
   }
   const target=zoneCenter(pz);
   const sx=L.bx0,sy=L.by0,sr=L.br0;

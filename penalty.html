@@ -124,20 +124,21 @@ function computeLayout(){
   L.br0=Math.min(W,H)*.085;
 
   if(img.bg){
-    // Map the goal's actual pixel positions in bg.png to canvas coords,
-    // using the same cover-fit transform as the background draw.
     const bw=img.bg.naturalWidth, bh=img.bg.naturalHeight;
-    const s=Math.max(W/bw, H/bh);
-    const ox=(W-bw*s)/2, oy=(H-bh*s)/2;
-    // Goal inner frame — strict-red pixel scan on bg.png (1280×720):
-    // Left post core x=320-328, Right post core x=965-978
-    // Crossbar y=211-225, Bottom bar y=448-458
-    const ix1=330, ix2=963,  // just inside the neon post cores
-          iy1=228, iy2=445;  // just inside crossbar → just above bottom bar
+    let s=Math.max(W/bw, H/bh);
+    let ox=(W-bw*s)/2, oy=(H-bh*s)/2;
+    // Portrait mobile: zoom in 1.3× and center on goal midpoint so goal fills more screen
+    if(H>W*1.3){
+      s*=1.3;
+      ox=(W-bw*s)/2;
+      oy=H*0.40-((228+445)/2)*s; // goal midpoint at 40% screen height
+    }
+    L._bgS=s; L._bgOx=ox; L._bgOy=oy;
+    const ix1=330, ix2=963, iy1=228, iy2=445;
     L.gx1=Math.max(1,      ox+ix1*s);
     L.gx2=Math.min(W-1,    ox+ix2*s);
     L.gy1=Math.max(1,      oy+iy1*s);
-    L.gy2=Math.min(H*.82,  oy+iy2*s); // cap so ball area is always visible
+    L.gy2=Math.min(H*.82,  oy+iy2*s);
   } else {
     L.gx1=W*.24; L.gx2=W*.76; L.gy1=H*.18; L.gy2=H*.58;
   }
@@ -929,10 +930,10 @@ function drawVignette(){
 function draw(){
   // Background: custom image > canvas-built cache
   if(img.bg){
-    // Cover-fit: scale uniformly to fill canvas, center-crop (preserves aspect ratio)
-    const s=Math.max(L.W/img.bg.naturalWidth, L.H/img.bg.naturalHeight);
-    const dw=img.bg.naturalWidth*s, dh=img.bg.naturalHeight*s;
-    ctx.drawImage(img.bg,(L.W-dw)/2,(L.H-dh)/2,dw,dh);
+    const s=L._bgS||Math.max(L.W/img.bg.naturalWidth,L.H/img.bg.naturalHeight);
+    const ox=L._bgOx!==undefined?L._bgOx:(L.W-img.bg.naturalWidth*s)/2;
+    const oy=L._bgOy!==undefined?L._bgOy:(L.H-img.bg.naturalHeight*s)/2;
+    ctx.drawImage(img.bg,ox,oy,img.bg.naturalWidth*s,img.bg.naturalHeight*s);
   } else if(bgCache) ctx.drawImage(bgCache,0,0);
   // bg.png already contains the pitch, goal, net, and field markings —
   // skip all canvas-drawn duplicates when the custom background is loaded

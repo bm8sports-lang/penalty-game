@@ -536,8 +536,8 @@ function buildGrass(){
 // ── Game state ─────────────────────────────────────────────────────────────
 const TOTAL=5;
 const gs={shot:0,goals:0,results:[],streak:0,best:0,histCol:new Array(3).fill(0),histRow:new Array(3).fill(0),busy:false,phase:'idle'};
-const A={ballX:0,ballY:0,ballR:0,spin:0,gkX:0,gkY:0,gkAngle:0,flashZone:-1,flashIsGoal:false,flashAlpha:0,hovered:-1,_done:false};
-function initAnim(){ A.ballX=L.bx0;A.ballY=L.by0;A.ballR=L.br0;A.gkX=L.gx1+L.gw*.5;A.gkY=0;A.gkAngle=0;A.flashZone=-1;A.flashAlpha=0; }
+const A={ballX:0,ballY:0,ballR:0,spin:0,gkX:0,gkY:0,gkAngle:0,gkSp:'idle',flashZone:-1,flashIsGoal:false,flashAlpha:0,hovered:-1,_done:false};
+function initAnim(){ A.ballX=L.bx0;A.ballY=L.by0;A.ballR=L.br0;A.gkX=L.gx1+L.gw*.5;A.gkY=0;A.gkAngle=0;A.gkSp='idle';A.flashZone=-1;A.flashAlpha=0; }
 
 function aiPickCol(){
   const s=gs.histCol.reduce((a,b)=>a+b,0);
@@ -578,19 +578,26 @@ function shoot(pz){
   }
   const target=zoneCenter(pz);
   const sx=L.bx0,sy=L.by0,sr=L.br0;
-  // Dive sprite is 440×320 (aspect 1.375) at gh*0.82 → width = gh*1.127
-  // Half-width as fraction of goal width: gkW/2/gw = gh*0.5635/gw
-  // Constrain dive target so sprite edge stays inside goal posts
-  const diveHalfW=L.gh*0.738*1.375*0.5;
-  const diveLeftFrac=Math.max(0.20, diveHalfW/L.gw);
-  const diveRightFrac=Math.min(0.80, 1-diveHalfW/L.gw);
+  // Dive sprite 440×320 (AR 1.375). Half-width when drawn = gh*ratio*1.375*0.5.
+  // Add 12px inward margin so the hand (which extends to the very image edge in
+  // the upper-corner sprites) stays inside the goal posts, not on or past them.
+  const isTopCorner=gkRow===0 && gkCol!==1;
+  const diveRatio=isTopCorner?0.738:0.738;
+  const diveHalfW=L.gh*diveRatio*1.375*0.5;
+  const handMargin=12;
+  const diveLeftFrac=Math.max(0.20, (diveHalfW+handMargin)/L.gw);
+  const diveRightFrac=Math.min(0.80, 1-(diveHalfW+handMargin)/L.gw);
   const gkTX=gkCol===0?L.gx1+L.gw*diveLeftFrac:gkCol===2?L.gx1+L.gw*diveRightFrac:L.gx1+L.gw*.5;
   // Top row: corners do an upper-corner flying dive (more upward + steeper tilt),
   // center does a vertical jump. Bottom row stays at ground level.
-  const isTopCorner=gkRow===0 && gkCol!==1;
   const gkTY=isTopCorner ? -L.gh*0.42 : (gkRow===0 ? -L.gh*0.22 : 0);
   const baseAng=gkCol===0?-36:gkCol===2?36:0;
   const gkTA=isTopCorner ? Math.sign(baseAng)*60 : baseAng;
+  // Lock sprite identity at dive start so we don't swap mid-animation.
+  if(isTopCorner) A.gkSp = gkCol===0?'dive_ul':'dive_ur';
+  else if(gkCol!==1) A.gkSp = gkCol===0?'dive_l':'dive_r';
+  else if(gkRow===0) A.gkSp = 'up';
+  else A.gkSp = 'idle';
   const gkSX=A.gkX,gkSY=A.gkY;
   gs.phase='flying';document.getElementById('aimHint').style.display='none';A._done=false;
   let t0=null;const FLY=480,GKD=85,RES=520,RST=1600;
@@ -609,7 +616,7 @@ function shoot(pz){
     }
     if(e>=RST){
       A.flashZone=-1;A.flashAlpha=0;A._done=false;
-      A.gkX=L.gx1+L.gw*.5;A.gkY=0;A.gkAngle=0;
+      A.gkX=L.gx1+L.gw*.5;A.gkY=0;A.gkAngle=0;A.gkSp='idle';
       A.ballX=L.bx0;A.ballY=L.by0;A.ballR=L.br0;
       hideMsg();gs.phase='idle';gs.busy=false;
       if(gs.shot>=TOTAL)setTimeout(showResult,200);else document.getElementById('aimHint').style.display='';
@@ -717,22 +724,21 @@ function drawGoalPosts(){
 
 // ── Draw: goalkeeper — image-aware ────────────────────────────────────────
 function drawGK(){
-  // Pick which sprite to use based on animation state
+  // Sprite locked at dive start (A.gkSp). Stay idle until motion actually
+  // begins so the dive pose appears at the same instant the body starts moving.
   let sp=null, isCornerDive=false;
-  if(img.gk_idle||img.gk_left||img.gk_right||img.gk_up){
-    const isUpperDive=A.gkY<-L.gh*0.30 && Math.abs(A.gkAngle)>8;
-    if(isUpperDive){
-      // Upper-corner: prefer dedicated tilted sprites; fall back to regular dive sprite
-      sp=A.gkAngle<0?(img.gk_up_left||img.gk_left||img.gk_idle):(img.gk_up_right||img.gk_right||img.gk_idle);
-      isCornerDive=(sp===img.gk_up_left||sp===img.gk_up_right);
-    } else if(Math.abs(A.gkAngle)>8){
-      sp=A.gkAngle<0?(img.gk_left||img.gk_idle):(img.gk_right||img.gk_idle);
-    } else if(A.gkY<-L.gh*0.08){
-      sp=img.gk_up||img.gk_idle;
-    } else {
-      sp=img.gk_idle;
-    }
-  }
+  const hasMoved=A.gkY!==0 || A.gkAngle!==0;
+  const want=hasMoved ? (A.gkSp||'idle') : 'idle';
+  const fallbacks={
+    dive_ul:[img.gk_up_left,img.gk_left,img.gk_idle],
+    dive_ur:[img.gk_up_right,img.gk_right,img.gk_idle],
+    dive_l: [img.gk_left,img.gk_idle],
+    dive_r: [img.gk_right,img.gk_idle],
+    up:     [img.gk_up,img.gk_idle],
+    idle:   [img.gk_idle],
+  };
+  for(const cand of (fallbacks[want]||fallbacks.idle)){ if(cand){sp=cand;break;} }
+  isCornerDive=(sp===img.gk_up_left||sp===img.gk_up_right);
   if(sp){
     // Different size per pose: idle stays big, dive/up shrink so they fit inside goal
     let gkHRatio=1.08;

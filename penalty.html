@@ -578,7 +578,7 @@ function shoot(pz){
   // Dive sprite is 440×320 (aspect 1.375) at gh*0.82 → width = gh*1.127
   // Half-width as fraction of goal width: gkW/2/gw = gh*0.5635/gw
   // Constrain dive target so sprite edge stays inside goal posts
-  const diveHalfW=L.gh*0.82*1.375*0.5;
+  const diveHalfW=L.gh*0.738*1.375*0.5;
   const diveLeftFrac=Math.max(0.20, diveHalfW/L.gw);
   const diveRightFrac=Math.min(0.80, 1-diveHalfW/L.gw);
   const gkTX=gkCol===0?L.gx1+L.gw*diveLeftFrac:gkCol===2?L.gx1+L.gw*diveRightFrac:L.gx1+L.gw*.5;
@@ -724,12 +724,14 @@ function drawGK(){
   }
   if(sp){
     // Different size per pose: idle stays big, dive/up shrink so they fit inside goal
-    let gkHRatio=1.20;
-    if(sp===img.gk_left||sp===img.gk_right) gkHRatio=0.82;
-    else if(sp===img.gk_up) gkHRatio=1.02;
+    let gkHRatio=1.08;
+    if(sp===img.gk_left||sp===img.gk_right) gkHRatio=0.738;
+    else if(sp===img.gk_up) gkHRatio=0.918;
     const gkH=L.gh*gkHRatio, gkW=gkH*sp.width/sp.height;
     ctx.save();
-    ctx.translate(A.gkX, L.gy2+A.gkY);
+    // Center GK body (head→feet) at goal vertical midpoint
+    const gkAnchor=(L.gy1+L.gy2)/2+gkH*0.41;
+    ctx.translate(A.gkX, gkAnchor+A.gkY);
     ctx.rotate(A.gkAngle*Math.PI/180);
     // Ground shadow
     ctx.fillStyle='rgba(0,0,0,0.22)';
@@ -745,8 +747,9 @@ function drawGK(){
 
 // ── Draw: goalkeeper canvas fallback ──────────────────────────────────────
 function drawGKCanvas(){
-  const sc=L.gh*.63/110, lw=1/sc;
-  ctx.save();ctx.translate(A.gkX,L.gy2+A.gkY);ctx.rotate(A.gkAngle*Math.PI/180);ctx.scale(sc,sc);
+  const sc=L.gh*.567/110, lw=1/sc;
+  const gkAnchorFb=(L.gy1+L.gy2)/2+L.gh*1.08*0.41;
+  ctx.save();ctx.translate(A.gkX,gkAnchorFb+A.gkY);ctx.rotate(A.gkAngle*Math.PI/180);ctx.scale(sc,sc);
   // Shadow
   const gsh=ctx.createRadialGradient(0,-1,1,0,-1,34);
   gsh.addColorStop(0,'rgba(0,0,0,0.55)');gsh.addColorStop(1,'rgba(0,0,0,0)');

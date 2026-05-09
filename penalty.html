@@ -127,24 +127,14 @@ function computeLayout(){
     const bw=img.bg.naturalWidth, bh=img.bg.naturalHeight;
     let s=Math.max(W/bw, H/bh);
     let ox=(W-bw*s)/2, oy=(H-bh*s)/2;
-    // Portrait mobile: zoom in 1.3× and center on goal midpoint so goal fills more screen
-    if(H>W*1.3){
-      s*=1.3;
-      ox=(W-bw*s)/2;
-      oy=H*0.40-((228+445)/2)*s; // goal midpoint at 40% screen height
-    }
-    L._bgS=s; L._bgOx=ox; L._bgOy=oy;
     const ix1=330, ix2=963, iy1=228, iy2=445;
+    // Portrait mobile: use cover-fit (no extra zoom) — goal is 244px tall and playable
+    // Side posts are off-screen but thin neon lines are drawn on top (see drawNeonPosts)
+    L._bgS=s; L._bgOx=ox; L._bgOy=oy;
     L.gx1=Math.max(1,      ox+ix1*s);
     L.gx2=Math.min(W-1,    ox+ix2*s);
     L.gy1=Math.max(1,      oy+iy1*s);
     L.gy2=Math.min(H*.82,  oy+iy2*s);
-    // On portrait mobile the posts are off-screen; enforce visible margin
-    if(H>W*1.3){
-      const mg=Math.round(W*0.055); // ~20px on 375px screen
-      L.gx1=Math.max(L.gx1, mg);
-      L.gx2=Math.min(L.gx2, W-mg);
-    }
   } else {
     L.gx1=W*.24; L.gx2=W*.76; L.gy1=H*.18; L.gy2=H*.58;
   }
@@ -935,28 +925,23 @@ function drawVignette(){
 // ── Neon post overlay (mobile portrait, bg.png side posts are off-screen) ──
 function drawNeonPosts(){
   const{gx1,gx2,gy1,gy2}=L;
-  const pw=Math.max(16,Math.min(26,L.gh*0.07));
-  function neonRect(x,y,w,h){
-    ctx.save();
-    ctx.shadowColor='rgba(255,40,0,1)'; ctx.shadowBlur=pw*3.5;
-    ctx.fillStyle='#ff3300'; ctx.fillRect(x,y,w,h);
-    ctx.shadowColor='rgba(255,140,60,1)'; ctx.shadowBlur=pw*1.5;
-    ctx.fillStyle='#ff6600'; ctx.fillRect(x,y,w,h);
-    ctx.shadowBlur=0;
-    // Bright inner core
-    const ci=w>h?1:Math.round(w*0.25), cj=w>h?Math.round(h*0.25):1;
-    ctx.fillStyle='rgba(255,210,150,0.9)';
-    ctx.fillRect(x+(w>h?0:w*0.3),y+(w>h?h*0.3:0),w>h?w:ci,w>h?cj:h);
-    ctx.restore();
-  }
-  // Left post
-  neonRect(gx1, gy1, pw, gy2-gy1);
-  // Right post
-  neonRect(gx2-pw, gy1, pw, gy2-gy1);
-  // Top crossbar (reinforce — bg.png version may be faint after zoom)
-  neonRect(gx1, gy1, gx2-gx1, pw);
-  // Bottom bar
-  neonRect(gx1, gy2-pw, gx2-gx1, pw);
+  ctx.save();
+  // Thin neon tube lines matching bg.png post style
+  ctx.shadowColor='rgba(255,60,0,0.95)';
+  ctx.shadowBlur=22;
+  ctx.strokeStyle='rgba(255,90,20,0.92)';
+  ctx.lineWidth=5;
+  ctx.lineCap='square';
+  ctx.beginPath();
+  ctx.moveTo(gx1+2.5,gy1); ctx.lineTo(gx1+2.5,gy2); // left post
+  ctx.moveTo(gx2-2.5,gy1); ctx.lineTo(gx2-2.5,gy2); // right post
+  ctx.stroke();
+  // Bright inner core highlight
+  ctx.shadowBlur=6;
+  ctx.strokeStyle='rgba(255,210,150,0.75)';
+  ctx.lineWidth=1.5;
+  ctx.stroke();
+  ctx.restore();
 }
 
 // ── Render loop ────────────────────────────────────────────────────────────
@@ -975,7 +960,6 @@ function draw(){
   drawGK();
   if(!img.bg) drawGoalFront();
   if(!img.bg) drawGoalPosts();
-  // On portrait mobile, bg.png side posts are off-screen — draw neon overlay posts
   if(img.bg && L.H>L.W*1.3) drawNeonPosts();
   drawZones();
   drawBall();

@@ -129,11 +129,12 @@ function computeLayout(){
   L._bgSrc=bgSrc||null;
   if(bgSrc){
     const bw=bgSrc.naturalWidth, bh=bgSrc.naturalHeight;
-    const s=Math.max(W/bw, H/bh);
+    const pm=bh>bw; // portrait mode image
+    const zoom=pm?1.2:1.0; // zoom-in 20% extra on portrait
+    const s=Math.max(W/bw, H/bh)*zoom;
     const ox=(W-bw*s)/2, oy=(H-bh*s)/2;
     L._bgS=s; L._bgOx=ox; L._bgOy=oy;
     // Goal coords differ by image orientation
-    const pm=bh>bw; // portrait mode image
     const ix1=pm?120:330, ix2=pm?735:963, iy1=pm?240:228, iy2=pm?700:445;
     L.gx1=Math.max(1,      ox+ix1*s);
     L.gx2=Math.min(W-1,    ox+ix2*s);

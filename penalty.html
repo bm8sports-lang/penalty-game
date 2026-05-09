@@ -926,6 +926,27 @@ function drawVignette(){
   ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
 }
 
+// ── Neon post overlay (mobile portrait, bg.png side posts are off-screen) ──
+function drawNeonPosts(){
+  const{gx1,gx2,gy1,gy2}=L;
+  const pw=Math.max(10,Math.min(20,L.gh*0.045));
+  ctx.save();
+  // Outer glow
+  ctx.shadowColor='rgba(255,50,0,1)';
+  ctx.shadowBlur=pw*3;
+  ctx.fillStyle='#ff4400';
+  ctx.fillRect(gx1,gy1,pw,gy2-gy1);
+  ctx.fillRect(gx2-pw,gy1,pw,gy2-gy1);
+  // Bright core
+  ctx.shadowColor='rgba(255,160,80,1)';
+  ctx.shadowBlur=pw;
+  ctx.fillStyle='rgba(255,200,130,0.85)';
+  const core=pw*0.28;
+  ctx.fillRect(gx1+pw*0.3,gy1,core,gy2-gy1);
+  ctx.fillRect(gx2-pw*0.3-core,gy1,core,gy2-gy1);
+  ctx.restore();
+}
+
 // ── Render loop ────────────────────────────────────────────────────────────
 function draw(){
   // Background: custom image > canvas-built cache
@@ -942,6 +963,8 @@ function draw(){
   drawGK();
   if(!img.bg) drawGoalFront();
   if(!img.bg) drawGoalPosts();
+  // On portrait mobile, bg.png side posts are off-screen — draw neon overlay posts
+  if(img.bg && L.H>L.W*1.3) drawNeonPosts();
   drawZones();
   drawBall();
   drawVignette();

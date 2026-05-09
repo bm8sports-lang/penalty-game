@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>点球大战</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -43,6 +43,23 @@
     .ls-bar { width:260px; height:6px; background:rgba(255,255,255,.15); border-radius:4px; overflow:hidden; }
     .ls-fill { height:100%; width:0%; background:#00e676; border-radius:4px; transition:width .2s; }
     .ls-hint { color:rgba(255,255,255,.4); font-size:12px; text-align:center; max-width:320px; line-height:1.6; }
+    /* ── Mobile ──────────────────────────────────────────────────────────── */
+    html,body { height:100%; }
+    #c { touch-action:none; }
+    @media (max-width:480px) {
+      .hud { gap:14px; padding:7px 16px; }
+      .hl { font-size:9px; }
+      .hv { font-size:18px; }
+      #statusMsg { font-size:30px; top:38%; }
+      .modal { padding:28px 24px; min-width:unset; width:88vw; }
+      .mt { font-size:22px; } .ms { font-size:15px; }
+      #streakBadge { top:66px; }
+    }
+    @supports (padding: env(safe-area-inset-bottom)) {
+      .pips    { bottom:calc(22px + env(safe-area-inset-bottom)); }
+      #shotLabel { bottom:calc(47px + env(safe-area-inset-bottom)); }
+      #aimHint   { bottom:calc(9% + env(safe-area-inset-bottom)); }
+    }
   </style>
 </head>
 <body>
@@ -51,7 +68,8 @@
   <div class="ls-ball">⚽</div>
   <div class="ls-txt">加载资源中…</div>
   <div class="ls-bar"><div class="ls-fill" id="lsFill"></div></div>
-  <div class="ls-hint">如需使用自定义素材，请将图片放入 assets/ 文件夹<br>缺失图片将自动使用内置画面</div>
+  <div class="ls-hint" id="lsHint">如需使用自定义素材，请将图片放入 assets/ 文件夹<br>缺失图片将自动使用内置画面</div>
+  <button class="btn" id="startBtn" style="display:none;margin-top:18px;font-size:18px;padding:14px 44px;">开始游戏 ⚽</button>
 </div>
 <div class="hud">
   <div class="hi"><span class="hl">本局进球</span><span class="hv" id="hGoals">0</span></div>
@@ -948,10 +966,11 @@ function restart(){
 // ── Input ──────────────────────────────────────────────────────────────────
 c.addEventListener('mousemove',e=>{const r=c.getBoundingClientRect(),mx=(e.clientX-r.left)*c.width/r.width,my=(e.clientY-r.top)*c.height/r.height;A.hovered=gs.phase==='idle'?zoneAt(mx,my):-1;c.style.cursor=(A.hovered>=0&&gs.phase==='idle')?'crosshair':'default';});
 c.addEventListener('click',e=>{if(gs.phase!=='idle')return;const r=c.getBoundingClientRect(),mx=(e.clientX-r.left)*c.width/r.width,my=(e.clientY-r.top)*c.height/r.height;const z=zoneAt(mx,my);if(z>=0)shoot(z);});
+c.addEventListener('touchstart',e=>{e.preventDefault();if(gs.phase!=='idle')return;const t=e.changedTouches[0],r=c.getBoundingClientRect(),mx=(t.clientX-r.left)*c.width/r.width,my=(t.clientY-r.top)*c.height/r.height;const z=zoneAt(mx,my);if(z>=0)shoot(z);},{passive:false});
 
 // ── Init ───────────────────────────────────────────────────────────────────
 function resize(){
-  c.width=window.innerWidth;c.height=window.innerHeight;
+  c.width=document.documentElement.clientWidth;c.height=document.documentElement.clientHeight;
   computeLayout();buildBG();buildGrass();initAnim();
 }
 window.addEventListener('resize',resize);
@@ -970,22 +989,32 @@ function toggleBGM(){
   else{bgm.play().then(()=>{musicBtn.textContent='🔊';bgmOn=true;}).catch(()=>{});}
 }
 musicBtn.addEventListener('click',toggleBGM);
-// Browsers block autoplay until user interacts — start music on first click anywhere
-function autoStartOnce(){
-  if(!bgmOn && bgmReady && !bgm.error){
+
+function startBGM(){
+  if(!bgmOn&&bgmReady&&!bgm.error){
     bgm.play().then(()=>{musicBtn.textContent='🔊';bgmOn=true;}).catch(()=>{});
   }
-  document.removeEventListener('click',autoStartOnce);
-  document.removeEventListener('touchstart',autoStartOnce);
 }
-document.addEventListener('click',autoStartOnce);
-document.addEventListener('touchstart',autoStartOnce);
 
-// Load assets first, then start game
+// Load assets → show "start" button → tap starts game + music
 loadAssets(()=>{
-  const ls=document.getElementById('loadScreen');
-  if(ls)ls.classList.add('hidden');
-  resize();renderPips();renderHUD();draw();
+  const lsTxt=document.querySelector('#loadScreen .ls-txt');
+  const lsHint=document.getElementById('lsHint');
+  const lsBar=document.querySelector('.ls-bar');
+  const startBtn=document.getElementById('startBtn');
+  if(lsTxt)lsTxt.textContent='准备好了！';
+  if(lsHint)lsHint.style.display='none';
+  if(lsBar)lsBar.style.display='none';
+  if(startBtn)startBtn.style.display='';
+  const go=()=>{
+    document.getElementById('loadScreen').classList.add('hidden');
+    resize();renderPips();renderHUD();draw();
+    startBGM();
+  };
+  if(startBtn){
+    startBtn.addEventListener('click',go);
+    startBtn.addEventListener('touchend',e=>{e.preventDefault();go();},{passive:false});
+  }
 });
 </script>
 </body>

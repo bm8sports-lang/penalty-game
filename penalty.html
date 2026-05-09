@@ -541,13 +541,19 @@ function shoot(pz){
   gs.busy=true;
   const pzCol=pz%3, pzRow=Math.floor(pz/3);
   gs.histCol[pzCol]++;gs.histRow[pzRow]++;
-  const gkCol=aiPickCol(), gkRow=aiPickRow();
-  let isGoal;
-  if(gkCol!==pzCol)             isGoal=true;
-  else if(pzRow===1)            isGoal=false;
-  else if(pzRow===0&&gkRow===0) isGoal=false;
-  else if(pzRow===2&&gkRow===1) isGoal=false;
-  else                          isGoal=true;
+  let gkCol,gkRow,isGoal;
+  if(Math.random()<0.85){
+    // 85% goal: GK dives wrong column
+    const wrong=[0,1,2].filter(c=>c!==pzCol);
+    gkCol=wrong[Math.floor(Math.random()*wrong.length)];
+    gkRow=Math.random()<0.5?0:1;
+    isGoal=true;
+  }else{
+    // 15% save: GK dives correct column and matching row
+    gkCol=pzCol;
+    gkRow=pzRow===0?0:1;
+    isGoal=false;
+  }
   const target=zoneCenter(pz);
   const sx=L.bx0,sy=L.by0,sr=L.br0;
   // Dive sprite is 440×320 (aspect 1.375) at gh*0.82 → width = gh*1.127

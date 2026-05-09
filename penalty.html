@@ -103,6 +103,8 @@ const ASSET_SRC={
   gk_idle: 'assets/gk_idle.png', // 220×440   门将待机，透明背景
   gk_left: 'assets/gk_dive_l.png',// 440×320  门将扑左，透明背景
   gk_right:'assets/gk_dive_r.png',// 440×320  门将扑右，透明背景（可水平翻转 gk_dive_l）
+  gk_up_left: 'assets/gk_dive_ul.png',// 440×320 上左角飞扑（含斜度），透明背景
+  gk_up_right:'assets/gk_dive_ur.png',// 440×320 上右角飞扑（含斜度），透明背景
   gk_up:   'assets/gk_up.png',   // 220×440   门将起跳，透明背景
 };
 const img={};
@@ -716,26 +718,33 @@ function drawGoalPosts(){
 // ── Draw: goalkeeper — image-aware ────────────────────────────────────────
 function drawGK(){
   // Pick which sprite to use based on animation state
-  let sp=null;
+  let sp=null, isCornerDive=false;
   if(img.gk_idle||img.gk_left||img.gk_right||img.gk_up){
-    if(Math.abs(A.gkAngle)>8)
+    const isUpperDive=A.gkY<-L.gh*0.30 && Math.abs(A.gkAngle)>8;
+    if(isUpperDive){
+      // Upper-corner: prefer dedicated tilted sprites; fall back to regular dive sprite
+      sp=A.gkAngle<0?(img.gk_up_left||img.gk_left||img.gk_idle):(img.gk_up_right||img.gk_right||img.gk_idle);
+      isCornerDive=(sp===img.gk_up_left||sp===img.gk_up_right);
+    } else if(Math.abs(A.gkAngle)>8){
       sp=A.gkAngle<0?(img.gk_left||img.gk_idle):(img.gk_right||img.gk_idle);
-    else if(A.gkY<-L.gh*.08)
+    } else if(A.gkY<-L.gh*0.08){
       sp=img.gk_up||img.gk_idle;
-    else
+    } else {
       sp=img.gk_idle;
+    }
   }
   if(sp){
     // Different size per pose: idle stays big, dive/up shrink so they fit inside goal
     let gkHRatio=1.08;
-    if(sp===img.gk_left||sp===img.gk_right) gkHRatio=0.738;
+    if(sp===img.gk_left||sp===img.gk_right||sp===img.gk_up_left||sp===img.gk_up_right) gkHRatio=0.738;
     else if(sp===img.gk_up) gkHRatio=0.918;
     const gkH=L.gh*gkHRatio, gkW=gkH*sp.width/sp.height;
     ctx.save();
     // Center GK body (head→feet) at goal vertical midpoint
     const gkAnchor=(L.gy1+L.gy2)/2+gkH*0.41;
     ctx.translate(A.gkX, gkAnchor+A.gkY);
-    ctx.rotate(A.gkAngle*Math.PI/180);
+    // Dedicated upper-corner sprites already have tilt baked in — skip rotation
+    if(!isCornerDive) ctx.rotate(A.gkAngle*Math.PI/180);
     // Ground shadow
     ctx.fillStyle='rgba(0,0,0,0.22)';
     ctx.beginPath();ctx.ellipse(0,0,gkW*.38,gkH*.04,0,0,Math.PI*2);ctx.fill();

@@ -139,6 +139,12 @@ function computeLayout(){
     L.gx2=Math.min(W-1,    ox+ix2*s);
     L.gy1=Math.max(1,      oy+iy1*s);
     L.gy2=Math.min(H*.82,  oy+iy2*s);
+    // On portrait mobile the posts are off-screen; enforce visible margin
+    if(H>W*1.3){
+      const mg=Math.round(W*0.055); // ~20px on 375px screen
+      L.gx1=Math.max(L.gx1, mg);
+      L.gx2=Math.min(L.gx2, W-mg);
+    }
   } else {
     L.gx1=W*.24; L.gx2=W*.76; L.gy1=H*.18; L.gy2=H*.58;
   }
@@ -929,22 +935,28 @@ function drawVignette(){
 // ── Neon post overlay (mobile portrait, bg.png side posts are off-screen) ──
 function drawNeonPosts(){
   const{gx1,gx2,gy1,gy2}=L;
-  const pw=Math.max(10,Math.min(20,L.gh*0.045));
-  ctx.save();
-  // Outer glow
-  ctx.shadowColor='rgba(255,50,0,1)';
-  ctx.shadowBlur=pw*3;
-  ctx.fillStyle='#ff4400';
-  ctx.fillRect(gx1,gy1,pw,gy2-gy1);
-  ctx.fillRect(gx2-pw,gy1,pw,gy2-gy1);
-  // Bright core
-  ctx.shadowColor='rgba(255,160,80,1)';
-  ctx.shadowBlur=pw;
-  ctx.fillStyle='rgba(255,200,130,0.85)';
-  const core=pw*0.28;
-  ctx.fillRect(gx1+pw*0.3,gy1,core,gy2-gy1);
-  ctx.fillRect(gx2-pw*0.3-core,gy1,core,gy2-gy1);
-  ctx.restore();
+  const pw=Math.max(16,Math.min(26,L.gh*0.07));
+  function neonRect(x,y,w,h){
+    ctx.save();
+    ctx.shadowColor='rgba(255,40,0,1)'; ctx.shadowBlur=pw*3.5;
+    ctx.fillStyle='#ff3300'; ctx.fillRect(x,y,w,h);
+    ctx.shadowColor='rgba(255,140,60,1)'; ctx.shadowBlur=pw*1.5;
+    ctx.fillStyle='#ff6600'; ctx.fillRect(x,y,w,h);
+    ctx.shadowBlur=0;
+    // Bright inner core
+    const ci=w>h?1:Math.round(w*0.25), cj=w>h?Math.round(h*0.25):1;
+    ctx.fillStyle='rgba(255,210,150,0.9)';
+    ctx.fillRect(x+(w>h?0:w*0.3),y+(w>h?h*0.3:0),w>h?w:ci,w>h?cj:h);
+    ctx.restore();
+  }
+  // Left post
+  neonRect(gx1, gy1, pw, gy2-gy1);
+  // Right post
+  neonRect(gx2-pw, gy1, pw, gy2-gy1);
+  // Top crossbar (reinforce — bg.png version may be faint after zoom)
+  neonRect(gx1, gy1, gx2-gx1, pw);
+  // Bottom bar
+  neonRect(gx1, gy2-pw, gx2-gx1, pw);
 }
 
 // ── Render loop ────────────────────────────────────────────────────────────

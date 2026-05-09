@@ -97,7 +97,8 @@ const c=document.getElementById('c'), ctx=c.getContext('2d');
 // Put your PNG files in  Desktop/assets/  next to penalty.html
 // Each asset falls back to built-in canvas drawing if the file is missing.
 const ASSET_SRC={
-  bg:      'assets/bg.png',       // 1280×720  全场景背景（含建筑/天空/涂鸦/棕榈/彩旗）
+  bg:        'assets/bg.png',          // 1280×720  横屏背景（桌面用）
+  bg_mobile: 'assets/bg_mobile.png',   // 750×1624  竖屏背景（手机用）
   ball:    'assets/ball.png',     // 256×256   足球，透明背景
   gk_idle: 'assets/gk_idle.png', // 220×440   门将待机，透明背景
   gk_left: 'assets/gk_dive_l.png',// 440×320  门将扑左，透明背景
@@ -123,14 +124,17 @@ function computeLayout(){
   const W=c.width,H=c.height; L.W=W;L.H=H;
   L.br0=Math.min(W,H)*.085;
 
-  if(img.bg){
-    const bw=img.bg.naturalWidth, bh=img.bg.naturalHeight;
-    let s=Math.max(W/bw, H/bh);
-    let ox=(W-bw*s)/2, oy=(H-bh*s)/2;
-    const ix1=330, ix2=963, iy1=228, iy2=445;
-    // Portrait mobile: use cover-fit (no extra zoom) — goal is 244px tall and playable
-    // Side posts are off-screen but thin neon lines are drawn on top (see drawNeonPosts)
+  // Pick bg: portrait mobile uses bg_mobile.png (750×1624), desktop uses bg.png (1280×720)
+  const bgSrc=(H>W*1.3 && img.bg_mobile) ? img.bg_mobile : img.bg;
+  L._bgSrc=bgSrc||null;
+  if(bgSrc){
+    const bw=bgSrc.naturalWidth, bh=bgSrc.naturalHeight;
+    const s=Math.max(W/bw, H/bh);
+    const ox=(W-bw*s)/2, oy=(H-bh*s)/2;
     L._bgS=s; L._bgOx=ox; L._bgOy=oy;
+    // Goal coords differ by image orientation
+    const pm=bh>bw; // portrait mode image
+    const ix1=pm?30:330, ix2=pm?720:963, iy1=pm?240:228, iy2=pm?760:445;
     L.gx1=Math.max(1,      ox+ix1*s);
     L.gx2=Math.min(W-1,    ox+ix2*s);
     L.gy1=Math.max(1,      oy+iy1*s);
@@ -946,21 +950,18 @@ function drawNeonPosts(){
 
 // ── Render loop ────────────────────────────────────────────────────────────
 function draw(){
-  // Background: custom image > canvas-built cache
-  if(img.bg){
-    const s=L._bgS||Math.max(L.W/img.bg.naturalWidth,L.H/img.bg.naturalHeight);
-    const ox=L._bgOx!==undefined?L._bgOx:(L.W-img.bg.naturalWidth*s)/2;
-    const oy=L._bgOy!==undefined?L._bgOy:(L.H-img.bg.naturalHeight*s)/2;
-    ctx.drawImage(img.bg,ox,oy,img.bg.naturalWidth*s,img.bg.naturalHeight*s);
+  // Background: bg_mobile (portrait) > bg (landscape) > canvas cache
+  if(L._bgSrc){
+    ctx.drawImage(L._bgSrc,L._bgOx,L._bgOy,L._bgSrc.naturalWidth*L._bgS,L._bgSrc.naturalHeight*L._bgS);
   } else if(bgCache) ctx.drawImage(bgCache,0,0);
-  // bg.png already contains the pitch, goal, net, and field markings —
-  // skip all canvas-drawn duplicates when the custom background is loaded
-  if(!img.bg) drawField();
-  if(!img.bg) drawGoalBack();
+  const hasBg=!!L._bgSrc;
+  if(!hasBg) drawField();
+  if(!hasBg) drawGoalBack();
   drawGK();
-  if(!img.bg) drawGoalFront();
-  if(!img.bg) drawGoalPosts();
-  if(img.bg && L.H>L.W*1.3) drawNeonPosts();
+  if(!hasBg) drawGoalFront();
+  if(!hasBg) drawGoalPosts();
+  // Draw neon posts only when using landscape bg.png on a portrait screen (posts off-screen)
+  if(hasBg && L.H>L.W*1.3 && !img.bg_mobile) drawNeonPosts();
   drawZones();
   drawBall();
   drawVignette();

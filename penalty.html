@@ -583,10 +583,12 @@ function shoot(pz){
   const diveLeftFrac=Math.max(0.20, diveHalfW/L.gw);
   const diveRightFrac=Math.min(0.80, 1-diveHalfW/L.gw);
   const gkTX=gkCol===0?L.gx1+L.gw*diveLeftFrac:gkCol===2?L.gx1+L.gw*diveRightFrac:L.gx1+L.gw*.5;
-  // Up sprite at gh*1.02 has feet anchor at gh*1.02*0.82 = 0.836 from top
-  // Max upward gkY (body top at gy1): -gh*(1-1.02*0.82) = -gh*0.164
-  const gkTY=gkRow===0?-L.gh*.13:0;
-  const gkTA=gkCol===0?-36:gkCol===2?36:0;
+  // Top row: corners do an upper-corner flying dive (more upward + steeper tilt),
+  // center does a vertical jump. Bottom row stays at ground level.
+  const isTopCorner=gkRow===0 && gkCol!==1;
+  const gkTY=isTopCorner ? -L.gh*0.42 : (gkRow===0 ? -L.gh*0.22 : 0);
+  const baseAng=gkCol===0?-36:gkCol===2?36:0;
+  const gkTA=isTopCorner ? Math.sign(baseAng)*55 : baseAng;
   const gkSX=A.gkX,gkSY=A.gkY;
   gs.phase='flying';document.getElementById('aimHint').style.display='none';A._done=false;
   let t0=null;const FLY=480,GKD=85,RES=520,RST=1600;

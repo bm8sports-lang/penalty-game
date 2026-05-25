@@ -6,54 +6,98 @@
   <title>点球大战</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { overflow:hidden; background:#1b4020; font-family:'Segoe UI',Arial,sans-serif; user-select:none; }
-    #c { display:block; }
-    .hud { position:fixed; top:14px; left:50%; transform:translateX(-50%); display:flex; gap:24px; background:rgba(0,0,0,0.55); backdrop-filter:blur(8px); padding:9px 28px; border-radius:40px; color:#fff; z-index:10; }
+    body { overflow:hidden; background:#1b4020; font-family:'Segoe UI',Arial,sans-serif; user-select:none; color:#fff; }
+    #c { display:block; transform-origin:center; }
+    body.shot-shake #c { animation:shotShake .22s ease-out; }
+    @keyframes shotShake {
+      0%,100% { transform:translate3d(0,0,0); }
+      22% { transform:translate3d(-5px,3px,0); }
+      45% { transform:translate3d(4px,-2px,0); }
+      68% { transform:translate3d(-2px,1px,0); }
+    }
+    .brandTag { position:fixed; top:14px; left:16px; z-index:12; display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background:rgba(9,31,38,.66); border:1px solid rgba(255,255,255,.20); box-shadow:0 10px 24px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.18); backdrop-filter:blur(10px); font-size:12px; font-weight:900; letter-spacing:.04em; text-transform:uppercase; }
+    .brandDot { width:20px; height:20px; border-radius:50%; display:grid; place-items:center; background:linear-gradient(180deg,#ffe86b,#ff8f00); color:#1c1700; box-shadow:0 0 16px rgba(255,214,0,.45); }
+    .hud { position:fixed; top:14px; right:70px; display:flex; gap:12px; background:linear-gradient(180deg,rgba(15,27,18,.72),rgba(5,10,8,.50)); backdrop-filter:blur(10px); padding:7px 14px; border-radius:999px; color:#fff; z-index:10; border:1px solid rgba(255,255,255,.14); box-shadow:0 12px 28px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.12); }
     .hi { display:flex; flex-direction:column; align-items:center; gap:1px; }
     .hl { font-size:10px; color:rgba(255,255,255,.45); text-transform:uppercase; letter-spacing:.06em; }
-    .hv { font-size:22px; font-weight:700; }
-    #statusMsg { position:fixed; top:42%; left:50%; transform:translate(-50%,-50%); font-size:40px; font-weight:900; color:#fff; text-shadow:0 2px 18px rgba(0,0,0,.8); pointer-events:none; z-index:10; opacity:0; transition:opacity .2s; }
-    #statusMsg.show { opacity:1; }
-    #streakBadge { position:fixed; top:78px; left:50%; transform:translateX(-50%); font-size:16px; font-weight:700; color:#ffd700; text-shadow:0 1px 4px rgba(0,0,0,.6); z-index:10; }
-    .pips { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); display:flex; gap:10px; z-index:10; }
+    .hv { font-size:22px; font-weight:800; line-height:1; }
+    #statusMsg { position:fixed; top:42%; left:50%; transform:translate(-50%,-50%) scale(.92); font-size:42px; font-weight:950; color:#fff; text-shadow:0 3px 20px rgba(0,0,0,.85),0 0 22px currentColor; pointer-events:none; z-index:10; opacity:0; transition:opacity .2s,transform .2s; white-space:nowrap; letter-spacing:0; }
+    #statusMsg.show { opacity:1; transform:translate(-50%,-50%) scale(1); }
+    #statusMsg.show.goal-pop { animation:msgPop .42s cubic-bezier(.16,1.4,.34,1); }
+    #statusMsg.show.save-pop { animation:msgPop .34s cubic-bezier(.16,1.25,.34,1); }
+    @keyframes msgPop { from { transform:translate(-50%,-50%) scale(.72); filter:blur(2px); } }
+    #streakBadge { position:fixed; top:76px; left:50%; transform:translateX(-50%); font-size:16px; font-weight:800; color:#ffd54f; text-shadow:0 2px 8px rgba(0,0,0,.7); z-index:10; }
+    .multiplierRail { position:fixed; top:88px; left:50%; transform:translateX(-50%); width:min(540px,74vw); z-index:11; display:grid; grid-template-columns:repeat(5,1fr); align-items:center; gap:0; pointer-events:none; }
+    .multiplierRail::before { content:""; position:absolute; left:8%; right:8%; top:50%; height:4px; transform:translateY(-50%); background:linear-gradient(90deg,rgba(255,255,255,.36),rgba(255,255,255,.60)); border-radius:999px; box-shadow:0 2px 8px rgba(0,0,0,.32); }
+    .multStep { position:relative; display:flex; flex-direction:column; align-items:center; gap:4px; color:#fff; font-size:11px; font-weight:900; text-shadow:0 2px 6px rgba(0,0,0,.72); }
+    .multStep::before { content:""; width:14px; height:14px; border-radius:50%; background:#f4f8ff; border:2px solid rgba(0,0,0,.20); box-shadow:0 2px 8px rgba(0,0,0,.32); }
+    .multStep.active::before { width:20px; height:20px; background:#ffd54f; box-shadow:0 0 0 5px rgba(255,213,79,.18),0 0 22px rgba(255,213,79,.9); }
+    .multStep.won::before { background:#00e676; box-shadow:0 0 18px rgba(0,230,118,.78); }
+    .multStep.lost::before { background:#ff5252; box-shadow:0 0 16px rgba(255,82,82,.72); }
+    .pips { position:fixed; bottom:86px; left:50%; transform:translateX(-50%); display:flex; gap:10px; z-index:10; }
     .pip { width:17px; height:17px; border-radius:50%; border:2.5px solid rgba(255,255,255,.45); background:transparent; transition:background .3s,border-color .3s; }
     .pip.goal { background:#00e676; border-color:#00e676; }
     .pip.miss { background:#ff5252; border-color:#ff5252; }
-    #shotLabel { position:fixed; bottom:47px; left:50%; transform:translateX(-50%); color:rgba(255,255,255,.55); font-size:13px; z-index:10; }
-    #aimHint   { position:fixed; bottom:9%; left:50%; transform:translateX(-50%); color:#fff; font-size:16px; font-weight:600; letter-spacing:.04em; text-shadow:0 2px 8px rgba(0,0,0,.8); pointer-events:none; z-index:10; }
+    #shotLabel { position:fixed; bottom:111px; left:50%; transform:translateX(-50%); color:rgba(255,255,255,.78); font-size:12px; font-weight:800; z-index:10; text-shadow:0 2px 6px rgba(0,0,0,.70); }
+    #aimHint   { position:fixed; bottom:136px; left:50%; transform:translateX(-50%); color:#fff; font-size:14px; font-weight:900; letter-spacing:.04em; text-shadow:0 2px 9px rgba(0,0,0,.9); pointer-events:none; z-index:10; background:linear-gradient(180deg,rgba(0,0,0,.45),rgba(0,0,0,.25)); border:1px solid rgba(255,255,255,.20); border-radius:999px; padding:8px 15px; backdrop-filter:blur(5px); }
     #musicBtn  { position:fixed; top:14px; right:16px; width:42px; height:42px; border-radius:50%; background:rgba(0,0,0,.55); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,.15); color:#fff; font-size:20px; cursor:pointer; z-index:11; display:flex; align-items:center; justify-content:center; transition:background .2s; user-select:none; }
     #musicBtn:hover { background:rgba(0,0,0,.75); }
-    .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:50; align-items:center; justify-content:center; }
+    .controlBar { position:fixed; left:50%; bottom:14px; transform:translateX(-50%); z-index:12; width:min(760px,calc(100vw - 24px)); min-height:62px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:14px; padding:10px 14px; background:linear-gradient(180deg,rgba(78,36,18,.86),rgba(50,20,10,.84)); border:1px solid rgba(255,255,255,.18); border-radius:18px; box-shadow:0 18px 40px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.18); backdrop-filter:blur(12px); }
+    .betBox,.balanceBox { display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .balanceBox { text-align:right; align-items:flex-end; }
+    .barLabel { font-size:10px; color:rgba(255,255,255,.56); font-weight:900; letter-spacing:.10em; text-transform:uppercase; }
+    .barValue { font-size:18px; color:#fff; font-weight:950; line-height:1; text-shadow:0 2px 8px rgba(0,0,0,.45); }
+    .betControls { display:flex; align-items:center; gap:8px; margin-top:4px; }
+    .miniBtn { width:28px; height:28px; border-radius:50%; border:1px solid rgba(255,255,255,.22); background:rgba(0,0,0,.28); color:#fff; font-size:17px; font-weight:900; cursor:pointer; display:grid; place-items:center; }
+    .collectBtn { min-width:106px; height:42px; border:0; border-radius:999px; background:linear-gradient(180deg,#ffffff,#d9fff0 46%,#00c853 47%,#009624); color:#06240e; font-size:14px; font-weight:950; letter-spacing:.03em; box-shadow:0 0 20px rgba(0,230,118,.34), inset 0 1px 0 rgba(255,255,255,.85); }
+    .collectBtn:disabled { filter:saturate(.45); opacity:.72; }
+    .overlay { display:none; position:fixed; inset:0; background:radial-gradient(circle at 50% 35%,rgba(255,214,0,.14),rgba(0,0,0,.78) 52%,rgba(0,0,0,.86)); z-index:50; align-items:center; justify-content:center; padding:20px; }
     .overlay.open { display:flex; }
-    .modal { background:#0f2010; border-radius:20px; padding:40px 52px; text-align:center; color:#fff; min-width:300px; box-shadow:0 24px 64px rgba(0,0,0,.6); border:1px solid rgba(100,255,100,.18); animation:popIn .3s cubic-bezier(.34,1.56,.64,1); }
+    .modal { background:linear-gradient(180deg,rgba(24,43,29,.96),rgba(8,18,14,.96)); border-radius:18px; padding:38px 48px; text-align:center; color:#fff; min-width:300px; box-shadow:0 26px 70px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.14); animation:popIn .3s cubic-bezier(.34,1.56,.64,1); }
     @keyframes popIn { from { transform:scale(.65); opacity:0; } }
     .me { font-size:64px; margin-bottom:6px; }
     .mt { font-size:28px; font-weight:800; margin-bottom:6px; }
     .ms { font-size:18px; color:rgba(255,255,255,.65); margin-bottom:4px; }
     .mf { font-size:13px; color:rgba(255,255,255,.35); margin-bottom:24px; }
-    .btn { padding:13px 36px; font-size:16px; font-weight:700; background:#2e7d32; color:#fff; border:none; border-radius:50px; cursor:pointer; transition:background .2s,transform .1s; }
-    .btn:hover { background:#1b5e20; }
+    .btn { padding:13px 36px; font-size:16px; font-weight:800; background:linear-gradient(180deg,#ffd54f,#f57f17); color:#1b1600; border:none; border-radius:999px; cursor:pointer; transition:filter .2s,transform .1s,box-shadow .2s; box-shadow:0 10px 22px rgba(245,127,23,.30), inset 0 1px 0 rgba(255,255,255,.55); }
+    .btn:hover { filter:brightness(1.06); box-shadow:0 12px 26px rgba(245,127,23,.42), inset 0 1px 0 rgba(255,255,255,.65); }
     .btn:active { transform:scale(.96); }
     /* Loading screen */
-    #loadScreen { position:fixed; inset:0; background:#0d1f10; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:20px; z-index:999; }
+    #loadScreen { position:fixed; inset:0; background:radial-gradient(circle at 50% 32%,rgba(255,213,79,.18),rgba(8,28,18,.78) 42%,#08140d 78%),linear-gradient(135deg,#133e24,#092017 48%,#32180c); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:16px; z-index:999; overflow:hidden; text-align:center; padding:22px; }
+    #loadScreen::before { content:""; position:absolute; inset:-15%; background:linear-gradient(115deg,transparent 0 42%,rgba(255,255,255,.08) 43% 44%,transparent 45% 100%); transform:rotate(-8deg); pointer-events:none; }
     #loadScreen.hidden { display:none; }
-    .ls-ball { font-size:64px; animation:spin 1.2s linear infinite; }
+    .ls-kicker { position:relative; z-index:1; width:min(440px,92vw); display:flex; flex-direction:column; align-items:center; gap:14px; }
+    .ls-title { font-size:clamp(38px,9vw,72px); line-height:.92; font-weight:950; text-transform:uppercase; letter-spacing:0; text-shadow:0 5px 28px rgba(0,0,0,.75); }
+    .ls-sub { color:rgba(255,255,255,.72); font-size:15px; font-weight:700; letter-spacing:.04em; }
+    .ls-ball { font-size:64px; animation:spin 1.2s linear infinite; filter:drop-shadow(0 10px 18px rgba(0,0,0,.36)); }
     @keyframes spin { to { transform:rotate(360deg); } }
     .ls-txt { color:#fff; font-size:18px; font-weight:600; letter-spacing:.08em; }
     .ls-bar { width:260px; height:6px; background:rgba(255,255,255,.15); border-radius:4px; overflow:hidden; }
     .ls-fill { height:100%; width:0%; background:#00e676; border-radius:4px; transition:width .2s; }
-    .ls-hint { color:rgba(255,255,255,.4); font-size:12px; text-align:center; max-width:320px; line-height:1.6; }
+    .ls-hint { color:rgba(255,255,255,.48); font-size:12px; text-align:center; max-width:320px; line-height:1.6; }
     /* ── Mobile ──────────────────────────────────────────────────────────── */
     html,body { height:100%; }
     #c { touch-action:none; }
     @media (max-width:480px) {
-      .hud { gap:14px; padding:7px 16px; }
+      .brandTag { top:10px; left:10px; padding:7px 10px; font-size:10px; }
+      .hud { gap:10px; padding:7px 11px; top:10px; right:56px; }
       .hl { font-size:9px; }
       .hv { font-size:18px; }
-      #statusMsg { font-size:30px; top:38%; }
+      #statusMsg { font-size:30px; top:40%; }
       .modal { padding:28px 24px; min-width:unset; width:88vw; }
       .mt { font-size:22px; } .ms { font-size:15px; }
-      #streakBadge { top:66px; }
+      #streakBadge { top:62px; font-size:14px; }
+      .multiplierRail { top:66px; width:88vw; }
+      .multStep { font-size:10px; }
+      #aimHint { bottom:124px; font-size:12px; padding:7px 12px; max-width:88vw; white-space:nowrap; }
+      #shotLabel { bottom:101px; }
+      .pips { bottom:76px; }
+      .controlBar { grid-template-columns:1fr auto; grid-template-areas:"bet collect" "balance balance"; gap:8px 10px; padding:9px 11px; border-radius:15px; }
+      .betBox { grid-area:bet; }
+      .collectBtn { grid-area:collect; min-width:86px; height:38px; font-size:12px; }
+      .balanceBox { grid-area:balance; text-align:left; align-items:flex-start; }
+      .barValue { font-size:16px; }
+      #musicBtn { top:10px; right:10px; width:38px; height:38px; }
     }
     @supports (padding: env(safe-area-inset-bottom)) {
       .pips    { bottom:calc(22px + env(safe-area-inset-bottom)); }
@@ -64,13 +108,19 @@
 </head>
 <body>
 <canvas id="c"></canvas>
+<div class="brandTag"><span class="brandDot">⚽</span><span>Street Penalty</span></div>
 <div id="loadScreen">
-  <div class="ls-ball">⚽</div>
-  <div class="ls-txt">加载资源中…</div>
-  <div class="ls-bar"><div class="ls-fill" id="lsFill"></div></div>
-  <div class="ls-hint" id="lsHint">如需使用自定义素材，请将图片放入 assets/ 文件夹<br>缺失图片将自动使用内置画面</div>
-  <button class="btn" id="startBtn" style="display:none;margin-top:18px;font-size:18px;padding:14px 44px;">开始游戏 ⚽</button>
+  <div class="ls-kicker">
+    <div class="ls-ball">⚽</div>
+    <div class="ls-title">点球大战</div>
+    <div class="ls-sub">读懂门将，命中死角</div>
+    <div class="ls-txt">加载资源中…</div>
+    <div class="ls-bar"><div class="ls-fill" id="lsFill"></div></div>
+    <div class="ls-hint" id="lsHint">如需使用自定义素材，请将图片放入 assets/ 文件夹<br>缺失图片将自动使用内置画面</div>
+    <button class="btn" id="startBtn" style="display:none;margin-top:10px;font-size:18px;padding:14px 44px;">开始射门 ⚽</button>
+  </div>
 </div>
+<div class="multiplierRail" id="multRail" aria-hidden="true"></div>
 <div class="hud">
   <div class="hi"><span class="hl">本局进球</span><span class="hv" id="hGoals">0</span></div>
   <div class="hi"><span class="hl">连续</span><span class="hv" id="hStreak">0</span></div>
@@ -80,8 +130,23 @@
 <div id="statusMsg"></div>
 <div id="shotLabel"></div>
 <div class="pips" id="pips"></div>
-<div id="aimHint">点击球门任意位置射门</div>
+<div id="aimHint">选择球门区域射门</div>
 <button id="musicBtn" title="音乐 / Music">🔇</button>
+<div class="controlBar">
+  <div class="betBox">
+    <span class="barLabel">BET</span>
+    <span class="barValue" id="betValue">100.00</span>
+    <div class="betControls">
+      <button class="miniBtn" id="betDown" type="button" aria-label="减少下注">−</button>
+      <button class="miniBtn" id="betUp" type="button" aria-label="增加下注">+</button>
+    </div>
+  </div>
+  <button class="collectBtn" id="collectBtn" type="button" disabled>COLLECT</button>
+  <div class="balanceBox">
+    <span class="barLabel">DEMO BALANCE</span>
+    <span class="barValue" id="balanceValue">1,000.00</span>
+  </div>
+</div>
 <audio id="bgm" src="assets/bgm.mp3" loop preload="auto"></audio>
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -92,6 +157,7 @@
 </div>
 <script>
 const c=document.getElementById('c'), ctx=c.getContext('2d');
+const USE_STREET_CANVAS_SCENE=true;
 
 // ── Image asset loader ─────────────────────────────────────────────────────
 // Put your PNG files in  Desktop/assets/  next to penalty.html
@@ -106,18 +172,68 @@ const ASSET_SRC={
   gk_up_left: 'assets/gk_dive_ul.png',// 440×320 上左角飞扑（含斜度），透明背景
   gk_up_right:'assets/gk_dive_ur.png',// 440×320 上右角飞扑（含斜度），透明背景
   gk_up:   'assets/gk_up.png',   // 220×440   门将起跳，透明背景
+  gk_bm8_sheet: 'assets/generated/gk_bm8_sheet.png',
 };
 const img={};
+const bm8Frames={};
 function loadAssets(done){
   const keys=Object.keys(ASSET_SRC), total=keys.length; let n=0;
-  const fill=document.getElementById('lsFill');
+  const fill=document.getElementById('lsFill'), hint=document.getElementById('lsHint');
   keys.forEach(k=>{
     const i=new Image();
-    const finish=()=>{ img[k]=i.complete&&i.naturalWidth?i:null; n++;
+    let settled=false;
+    const finish=()=>{ if(settled)return; settled=true; img[k]=i.complete&&i.naturalWidth?i:null; n++;
       if(fill)fill.style.width=(n/total*100)+'%';
+      if(hint)hint.textContent=`加载 ${n} / ${total}: ${k}`;
       if(n>=total)done(); };
     i.onload=finish; i.onerror=finish; i.src=ASSET_SRC[k];
+    setTimeout(finish,3500);
   });
+}
+
+const BM8_FRAME_RECTS={
+  idle:{x:22,y:48,w:360,h:390},
+  crouch:{x:402,y:142,w:330,h:320},
+  push_l:{x:755,y:48,w:360,h:410},
+  fly_l_1:{x:1110,y:48,w:410,h:410},
+  fly_l_2:{x:18,y:635,w:500,h:260},
+  land_l:{x:490,y:720,w:390,h:230},
+  up:{x:915,y:420,w:230,h:520},
+  fly_ul:{x:1095,y:465,w:420,h:470},
+};
+function buildBm8Frames(){
+  if(!img.gk_bm8_sheet)return;
+  Object.entries(BM8_FRAME_RECTS).forEach(([name,r])=>{
+    const pad=8;
+    const o=document.createElement('canvas');o.width=r.w;o.height=r.h;
+    const g=o.getContext('2d',{willReadFrequently:true});
+    g.drawImage(img.gk_bm8_sheet,r.x,r.y,r.w,r.h,0,0,r.w,r.h);
+    const data=g.getImageData(0,0,r.w,r.h), px=data.data;
+    for(let i=0;i<px.length;i+=4){
+      const rr=px[i],gg=px[i+1],bb=px[i+2];
+      const green=gg>125&&rr<110&&bb<110&&(gg-rr)>55&&(gg-bb)>55;
+      if(green){px[i+3]=0;continue;}
+      const spill=gg>90&&(gg-rr)>26&&(gg-bb)>26;
+      if(spill)px[i+1]=Math.min(px[i+1],Math.max(rr,bb)+18);
+    }
+    g.putImageData(data,0,0);
+    const box=trimCanvas(o,pad);
+    bm8Frames[name]=box;
+  });
+}
+function trimCanvas(src,pad=8){
+  const g=src.getContext('2d',{willReadFrequently:true});
+  const {width:w,height:h}=src;
+  const data=g.getImageData(0,0,w,h).data;
+  let x1=w,y1=h,x2=0,y2=0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    if(data[(y*w+x)*4+3]>8){if(x<x1)x1=x;if(x>x2)x2=x;if(y<y1)y1=y;if(y>y2)y2=y;}
+  }
+  if(x2<=x1||y2<=y1)return src;
+  x1=Math.max(0,x1-pad);y1=Math.max(0,y1-pad);x2=Math.min(w,x2+pad);y2=Math.min(h,y2+pad);
+  const o=document.createElement('canvas');o.width=x2-x1;o.height=y2-y1;
+  o.getContext('2d').drawImage(src,x1,y1,o.width,o.height,0,0,o.width,o.height);
+  return o;
 }
 
 // ── Layout ─────────────────────────────────────────────────────────────────
@@ -127,7 +243,7 @@ function computeLayout(){
   L.br0=Math.min(W,H)*.085;
 
   // Pick bg: portrait mobile uses bg_mobile.png (750×1624), desktop uses bg.png (1280×720)
-  const bgSrc=(H>W*1.3 && img.bg_mobile) ? img.bg_mobile : img.bg;
+  const bgSrc=USE_STREET_CANVAS_SCENE ? null : ((H>W*1.3 && img.bg_mobile) ? img.bg_mobile : img.bg);
   L._bgSrc=bgSrc||null;
   if(bgSrc){
     const bw=bgSrc.naturalWidth, bh=bgSrc.naturalHeight;
@@ -143,7 +259,7 @@ function computeLayout(){
     L.gy1=Math.max(1,      oy+iy1*s);
     L.gy2=Math.min(H*.82,  oy+iy2*s);
   } else {
-    L.gx1=W*.24; L.gx2=W*.76; L.gy1=H*.18; L.gy2=H*.58;
+    L.gx1=W*.18; L.gx2=W*.82; L.gy1=H*.22; L.gy2=H*.58;
   }
 
   L.gw=L.gx2-L.gx1; L.gh=L.gy2-L.gy1;
@@ -536,8 +652,10 @@ function buildGrass(){
 // ── Game state ─────────────────────────────────────────────────────────────
 const TOTAL=5;
 const gs={shot:0,goals:0,results:[],streak:0,best:0,histCol:new Array(3).fill(0),histRow:new Array(3).fill(0),busy:false,phase:'idle'};
-const A={ballX:0,ballY:0,ballR:0,spin:0,gkX:0,gkY:0,gkAngle:0,gkSp:'idle',flashZone:-1,flashIsGoal:false,flashAlpha:0,hovered:-1,_done:false};
-function initAnim(){ A.ballX=L.bx0;A.ballY=L.by0;A.ballR=L.br0;A.gkX=L.gx1+L.gw*.5;A.gkY=0;A.gkAngle=0;A.gkSp='idle';A.flashZone=-1;A.flashAlpha=0; }
+const MULTS=[2,4,12,20,32];
+const econ={bet:100,balance:1000};
+const A={ballX:0,ballY:0,ballR:0,spin:0,gkX:0,gkY:0,gkAngle:0,gkScaleX:1,gkScaleY:1,gkPoseT:0,gkPhase:'idle',gkDiveDir:0,gkDiveRow:1,gkSp:'idle',flashZone:-1,flashIsGoal:false,flashAlpha:0,hovered:-1,trail:[],_done:false};
+function initAnim(){ A.ballX=L.bx0;A.ballY=L.by0;A.ballR=L.br0;A.gkX=L.gx1+L.gw*.5;A.gkY=0;A.gkAngle=0;A.gkScaleX=1;A.gkScaleY=1;A.gkPoseT=0;A.gkPhase='idle';A.gkDiveDir=0;A.gkDiveRow=1;A.gkSp='idle';A.flashZone=-1;A.flashAlpha=0;A.trail=[]; }
 
 function aiPickCol(){
   const s=gs.histCol.reduce((a,b)=>a+b,0);
@@ -557,10 +675,15 @@ function zoneRect(z){const c2=z%3,r=Math.floor(z/3);return{x:L.gx1+c2*L.gw/3,y:L
 function zoneCenter(z){const r=zoneRect(z);return{x:r.x+r.w/2,y:r.y+r.h/2};}
 function zoneAt(mx,my){if(mx<L.gx1||mx>L.gx2||my<L.gy1||my>L.gy2)return -1;return Math.min(Math.floor((my-L.gy1)/L.gh*3),2)*3+Math.min(Math.floor((mx-L.gx1)/L.gw*3),2);}
 function lerp(a,b,t){return a+(b-a)*t;}
+function easeOutBack(t){const c1=1.55,c3=c1+1;return 1+c3*(t-1)**3+c1*(t-1)**2;}
+function easeOutCubic(t){return 1-(1-t)**3;}
+function gkAnticipation(t){return Math.sin(Math.min(t,1)*Math.PI);}
+function gkOvershoot(t){return easeOutBack(Math.min(t,1));}
 
 function shoot(pz){
   if(gs.busy||gs.phase!=='idle'||gs.shot>=TOTAL)return;
   gs.busy=true;
+  kickFeedback();
   const pzCol=pz%3, pzRow=Math.floor(pz/3);
   gs.histCol[pzCol]++;gs.histRow[pzRow]++;
   let gkCol,gkRow,isGoal;
@@ -590,33 +713,52 @@ function shoot(pz){
   const gkTX=gkCol===0?L.gx1+L.gw*diveLeftFrac:gkCol===2?L.gx1+L.gw*diveRightFrac:L.gx1+L.gw*.5;
   // Top row: corners do an upper-corner flying dive (more upward + steeper tilt),
   // center does a vertical jump. Bottom row stays at ground level.
-  const gkTY=isTopCorner ? -L.gh*0.42 : (gkRow===0 ? -L.gh*0.22 : 0);
-  const baseAng=gkCol===0?-36:gkCol===2?36:0;
-  const gkTA=isTopCorner ? Math.sign(baseAng)*60 : baseAng;
+  const diveDir=gkCol===0?-1:gkCol===2?1:0;
+  const gkTY=isTopCorner ? -L.gh*0.48 : (gkRow===0 ? -L.gh*0.28 : L.gh*0.03);
+  const baseAng=diveDir<0?-28:diveDir>0?28:0;
+  const gkTA=isTopCorner ? Math.sign(baseAng)*48 : baseAng;
   // Lock sprite identity at dive start so we don't swap mid-animation.
   if(isTopCorner) A.gkSp = gkCol===0?'dive_ul':'dive_ur';
   else if(gkCol!==1) A.gkSp = gkCol===0?'dive_l':'dive_r';
   else if(gkRow===0) A.gkSp = 'up';
   else A.gkSp = 'idle';
+  A.gkDiveDir=diveDir;A.gkDiveRow=gkRow;A.gkPhase='anticipate';A.gkPoseT=0;
   const gkSX=A.gkX,gkSY=A.gkY;
-  gs.phase='flying';document.getElementById('aimHint').style.display='none';A._done=false;
-  let t0=null;const FLY=480,GKD=85,RES=520,RST=1600;
+  gs.phase='flying';document.getElementById('aimHint').style.display='none';A._done=false;A.trail=[];
+  let t0=null;const FLY=420,ANT=95,GKD=70,RES=460,RST=1350;
   function step(ts){
     if(!t0)t0=ts;const e=ts-t0;
     const bt=Math.min(e/FLY,1),be=1-(1-bt)**2;
-    A.ballX=lerp(sx,target.x,be);A.ballY=lerp(sy,target.y,be);A.ballR=lerp(sr,sr*.45,be);A.spin+=.12;
-    if(e>GKD){const gt=Math.min((e-GKD)/(FLY-GKD),1),ge=1-(1-gt)**2;
-      A.gkX=lerp(gkSX,gkTX,ge);A.gkY=lerp(gkSY,gkTY,ge);A.gkAngle=lerp(0,gkTA,ge);}
+    A.ballX=lerp(sx,target.x,be);A.ballY=lerp(sy,target.y,be);A.ballR=lerp(sr,sr*.40,be);A.spin+=.18;
+    if(e<FLY){A.trail.push({x:A.ballX,y:A.ballY,r:A.ballR,a:.55});if(A.trail.length>12)A.trail.shift();}
+    if(e<GKD+ANT){
+      const crouch=gkAnticipation(e/(GKD+ANT));
+      A.gkX=gkSX-diveDir*L.gw*.018*crouch;
+      A.gkY=L.gh*.035*crouch;
+      A.gkAngle=-diveDir*6*crouch;
+      A.gkScaleX=1+.10*crouch;
+      A.gkScaleY=1-.12*crouch;
+      A.gkPhase='anticipate';A.gkPoseT=crouch;
+    }else{
+      const gt=Math.min((e-GKD-ANT)/(FLY-GKD-ANT),1),ge=gkOvershoot(gt);
+      const arc=Math.sin(Math.min(gt,1)*Math.PI);
+      A.gkX=lerp(gkSX,gkTX,ge);
+      A.gkY=lerp(gkSY,gkTY,ge)-arc*L.gh*(isTopCorner?.11:.06);
+      A.gkAngle=lerp(-diveDir*6,gkTA,Math.min(ge,1));
+      A.gkScaleX=1+.12*(1-gt);
+      A.gkScaleY=1-.08*(1-gt);
+      A.gkPhase=gt>.82?'land':'dive';A.gkPoseT=gt;
+    }
     if(e>=RES){A.flashZone=pz;A.flashIsGoal=isGoal;A.flashAlpha=Math.min((e-RES)/150,1);}
     if(e>=RES&&!A._done){
       A._done=true;
-      if(isGoal){gs.goals++;gs.streak++;if(gs.streak>gs.best)gs.best=gs.streak;showMsg('⚽  进球！','#ffeb3b');document.getElementById('streakBadge').textContent=gs.streak>=3?`🔥 ${gs.streak} 连击！`:'';}
-      else{gs.streak=0;showMsg('🙅  被扑出！','#ff6060');document.getElementById('streakBadge').textContent='';}
+      if(isGoal){gs.goals++;gs.streak++;if(gs.streak>gs.best)gs.best=gs.streak;showMsg('⚽  进球！','#ffeb3b','goal-pop');document.getElementById('streakBadge').textContent=gs.streak>=3?`🔥 ${gs.streak} 连击！`:'';}
+      else{gs.streak=0;showMsg('🙅  被扑出！','#ff6060','save-pop');document.getElementById('streakBadge').textContent='';}
       gs.results.push(isGoal?'goal':'miss');gs.shot++;renderPips();renderHUD();
     }
     if(e>=RST){
       A.flashZone=-1;A.flashAlpha=0;A._done=false;
-      A.gkX=L.gx1+L.gw*.5;A.gkY=0;A.gkAngle=0;A.gkSp='idle';
+      A.gkX=L.gx1+L.gw*.5;A.gkY=0;A.gkAngle=0;A.gkScaleX=1;A.gkScaleY=1;A.gkPoseT=0;A.gkPhase='idle';A.gkDiveDir=0;A.gkSp='idle';
       A.ballX=L.bx0;A.ballY=L.by0;A.ballR=L.br0;
       hideMsg();gs.phase='idle';gs.busy=false;
       if(gs.shot>=TOTAL)setTimeout(showResult,200);else document.getElementById('aimHint').style.display='';
@@ -724,11 +866,12 @@ function drawGoalPosts(){
 
 // ── Draw: goalkeeper — image-aware ────────────────────────────────────────
 function drawGK(){
+  if(USE_STREET_CANVAS_SCENE && bm8Frames.idle) return drawBm8GK();
   // Sprite locked at dive start (A.gkSp). Stay idle until motion actually
   // begins so the dive pose appears at the same instant the body starts moving.
   let sp=null, isCornerDive=false;
-  const hasMoved=A.gkY!==0 || A.gkAngle!==0;
-  const want=hasMoved ? (A.gkSp||'idle') : 'idle';
+  const hasMoved=A.gkY!==0 || A.gkAngle!==0 || A.gkPhase!=='idle';
+  const want=gkSpriteForPhase(hasMoved);
   const fallbacks={
     dive_ul:[img.gk_up_left,img.gk_left,img.gk_idle],
     dive_ur:[img.gk_up_right,img.gk_right,img.gk_idle],
@@ -740,17 +883,19 @@ function drawGK(){
   for(const cand of (fallbacks[want]||fallbacks.idle)){ if(cand){sp=cand;break;} }
   isCornerDive=(sp===img.gk_up_left||sp===img.gk_up_right);
   if(sp){
-    // Different size per pose: idle stays big, dive/up shrink so they fit inside goal
+    const stage=gkStage();
     let gkHRatio=1.08;
     if(sp===img.gk_left||sp===img.gk_right||sp===img.gk_up_left||sp===img.gk_up_right) gkHRatio=0.738;
     else if(sp===img.gk_up) gkHRatio=0.918;
+    gkHRatio*=stage.size;
     const gkH=L.gh*gkHRatio, gkW=gkH*sp.width/sp.height;
     ctx.save();
     // Center GK body (head→feet) at goal vertical midpoint
     const gkAnchor=(L.gy1+L.gy2)/2+gkH*0.41;
-    ctx.translate(A.gkX, gkAnchor+A.gkY);
+    ctx.translate(A.gkX+stage.x, gkAnchor+A.gkY+stage.y);
     // Dedicated upper-corner sprites already have tilt baked in — skip rotation
-    if(!isCornerDive) ctx.rotate(A.gkAngle*Math.PI/180);
+    if(!isCornerDive) ctx.rotate((A.gkAngle+stage.angle)*Math.PI/180);
+    ctx.scale((A.gkScaleX||1)*stage.sx,(A.gkScaleY||1)*stage.sy);
     // Ground shadow
     ctx.fillStyle='rgba(0,0,0,0.22)';
     ctx.beginPath();ctx.ellipse(0,0,gkW*.38,gkH*.04,0,0,Math.PI*2);ctx.fill();
@@ -763,11 +908,153 @@ function drawGK(){
   drawGKCanvas(); // fallback
 }
 
+function bm8FrameForPhase(){
+  if(A.gkPhase==='anticipate')return A.gkDiveRow===0?'up':'crouch';
+  if(A.gkPhase==='land')return A.gkDiveRow===0?'fly_ul':'land_l';
+  if(A.gkPhase==='dive'){
+    if(A.gkDiveRow===0&&A.gkDiveDir===0)return 'up';
+    if(A.gkDiveRow===0)return 'fly_ul';
+    return A.gkPoseT>.52?'fly_l_2':'fly_l_1';
+  }
+  return 'idle';
+}
+function drawBm8GK(){
+  const key=bm8FrameForPhase();
+  const frame=bm8Frames[key]||bm8Frames.idle;
+  const stage=gkStage();
+  const flip=(A.gkDiveDir||0)>0 && key!=='idle' && key!=='crouch' && key!=='up';
+  const frameScale=key==='idle'?1.15:key==='crouch'?1.02:key==='up'?1.18:key==='land_l'?0.78:0.92;
+  let h=L.gh*frameScale*stage.size;
+  let w=h*frame.width/frame.height;
+  const anchor=(L.gy1+L.gy2)/2+L.gh*.46;
+  ctx.save();
+  ctx.translate(A.gkX+stage.x,anchor+A.gkY+stage.y);
+  ctx.rotate((A.gkAngle+stage.angle)*Math.PI/180);
+  ctx.scale((flip?-1:1)*(A.gkScaleX||1)*stage.sx,(A.gkScaleY||1)*stage.sy);
+  ctx.fillStyle='rgba(0,0,0,.24)';
+  ctx.beginPath();ctx.ellipse(0,6,w*.28,h*.035,0,0,Math.PI*2);ctx.fill();
+  const yOffset=key==='land_l'?-h*.42:key==='fly_l_1'||key==='fly_l_2'||key==='fly_ul'?-h*.50:-h*.72;
+  ctx.drawImage(frame,-w/2,yOffset,w,h);
+  ctx.restore();
+}
+
+function gkSpriteForPhase(hasMoved){
+  if(A.gkPhase==='anticipate') return A.gkDiveRow===0?'up':'idle';
+  if(A.gkPhase==='land') return A.gkSp||'idle';
+  return hasMoved ? (A.gkSp||'idle') : 'idle';
+}
+
+function gkStage(){
+  const dir=A.gkDiveDir||0,t=A.gkPoseT||0;
+  if(A.gkPhase==='anticipate'){
+    const c=gkAnticipation(t);
+    return {x:-dir*L.gw*.018*c,y:L.gh*.030*c,angle:-dir*5*c,sx:1+.08*c,sy:1-.10*c,size:1};
+  }
+  if(A.gkPhase==='dive'){
+    const snap=Math.sin(Math.min(t,1)*Math.PI);
+    return {x:dir*L.gw*.012*snap,y:-L.gh*.018*snap,angle:dir*4*snap,sx:1+.04*(1-t),sy:1-.03*(1-t),size:1+.035*snap};
+  }
+  if(A.gkPhase==='land'){
+    const l=Math.min((t-.82)/.18,1);
+    return {x:0,y:L.gh*.022*l,angle:-dir*5*l,sx:1+.06*l,sy:1-.06*l,size:1};
+  }
+  return {x:0,y:0,angle:0,sx:1,sy:1,size:1};
+}
+
+function drawAnimatedGK(){
+  const dir=A.gkDiveDir||0, t=A.gkPoseT||0, diving=A.gkPhase==='dive'||A.gkPhase==='land';
+  const sideDive=diving&&dir!==0;
+  const upDive=diving&&dir===0&&A.gkDiveRow===0;
+  const sc=L.gh/230;
+  const anchor=(L.gy1+L.gy2)/2+L.gh*.43;
+  const crouch=A.gkPhase==='anticipate'?t:0;
+  const flight=diving?Math.min(t,1):0;
+  const land=A.gkPhase==='land'?Math.min((t-.82)/.18,1):0;
+  ctx.save();
+  ctx.translate(A.gkX,anchor+A.gkY);
+  ctx.rotate(A.gkAngle*Math.PI/180);
+  ctx.scale(sc*(A.gkScaleX||1),sc*(A.gkScaleY||1));
+
+  const lean=sideDive?dir*(26+18*flight):dir*-8*crouch;
+  const torsoY=-72+18*crouch-8*Math.sin(flight*Math.PI);
+  const headY=torsoY-38-6*flight;
+  const shoulderY=torsoY-22;
+  const hipY=torsoY+27;
+  const shoulderL={x:-20,y:shoulderY}, shoulderR={x:20,y:shoulderY};
+  const hipL={x:-13,y:hipY}, hipR={x:13,y:hipY};
+
+  let gloveL={x:-58,y:-58}, gloveR={x:58,y:-58};
+  let footL={x:-24,y:-3}, footR={x:24,y:-3};
+  if(crouch){
+    gloveL={x:-54-dir*10*crouch,y:-44+16*crouch};
+    gloveR={x:54-dir*10*crouch,y:-44+16*crouch};
+    footL={x:-30-dir*7*crouch,y:0};
+    footR={x:30-dir*7*crouch,y:0};
+  }
+  if(sideDive){
+    const reach=120*flight;
+    gloveL={x:dir>0?28+reach:-78-reach*.18,y:-65-34*flight};
+    gloveR={x:dir>0?58+reach:-28-reach,y:-69-38*flight};
+    footL={x:-18-dir*86*flight,y:-4+32*flight+10*land};
+    footR={x:24-dir*62*flight,y:12+44*flight+10*land};
+  }else if(upDive){
+    gloveL={x:-34,y:-92-80*flight};
+    gloveR={x:34,y:-92-80*flight};
+    footL={x:-22,y:2+18*flight};
+    footR={x:22,y:2+18*flight};
+  }
+
+  ctx.fillStyle='rgba(0,0,0,.28)';
+  ctx.beginPath();ctx.ellipse(0,8,54+28*flight,10+4*land,0,0,Math.PI*2);ctx.fill();
+
+  function drawLimb(a,b,c,w,col){
+    ctx.strokeStyle=col;ctx.lineWidth=w;ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(b.x,b.y,c.x,c.y);ctx.stroke();
+  }
+  function glove(p,flip){
+    ctx.save();ctx.translate(p.x,p.y);ctx.rotate((flip?-0.24:0.24)+dir*.12*flight);
+    const gg=ctx.createLinearGradient(-15,-10,16,12);
+    gg.addColorStop(0,'#fff176');gg.addColorStop(.55,'#f9c823');gg.addColorStop(1,'#c27a00');
+    ctx.fillStyle=gg;ctx.beginPath();rr(ctx,-16,-11,32,22,7);ctx.fill();
+    ctx.strokeStyle='rgba(90,54,0,.42)';ctx.lineWidth=1.5;
+    for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(-10,-5+i*5);ctx.lineTo(11,-5+i*5);ctx.stroke();}
+    ctx.restore();
+  }
+
+  ctx.save();ctx.rotate(lean*Math.PI/180);
+  drawLimb(shoulderL,{x:-48-dir*14*flight,y:-50-20*flight},gloveL,13,'#1f8fe5');
+  drawLimb(shoulderR,{x:48+dir*14*flight,y:-50-20*flight},gloveR,13,'#1f8fe5');
+  drawLimb(hipL,{x:-32-dir*35*flight,y:-8+22*flight},footL,14,'#151535');
+  drawLimb(hipR,{x:34-dir*25*flight,y:-2+30*flight},footR,14,'#151535');
+
+  const jersey=ctx.createLinearGradient(-28,torsoY-34,28,torsoY+30);
+  jersey.addColorStop(0,'#42b8ff');jersey.addColorStop(.48,'#1677c9');jersey.addColorStop(1,'#0d3f91');
+  ctx.fillStyle=jersey;
+  ctx.beginPath();
+  ctx.moveTo(-25,torsoY-31);ctx.quadraticCurveTo(0,torsoY-43,25,torsoY-31);
+  ctx.lineTo(18,torsoY+30);ctx.quadraticCurveTo(0,torsoY+38,-18,torsoY+30);
+  ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.22)';ctx.fillRect(-21,torsoY-14,42,6);
+  ctx.fillStyle='rgba(255,255,255,.86)';ctx.font='bold 24px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('1',0,torsoY+4);
+  ctx.fillStyle='#101037';ctx.beginPath();ctx.moveTo(-20,torsoY+26);ctx.lineTo(20,torsoY+26);ctx.lineTo(15,torsoY+54);ctx.lineTo(-15,torsoY+54);ctx.closePath();ctx.fill();
+
+  ctx.fillStyle='#d69b5f';ctx.beginPath();ctx.arc(0,headY,17,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#20100a';ctx.beginPath();ctx.ellipse(0,headY-11,18,9,0,Math.PI,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#111';ctx.beginPath();ctx.arc(-6,headY-1,2.2,0,Math.PI*2);ctx.arc(6,headY-1,2.2,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='rgba(80,30,20,.7)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-5,headY+8);ctx.quadraticCurveTo(0,headY+11,6,headY+8);ctx.stroke();
+  ctx.restore();
+
+  glove(gloveL,true);glove(gloveR,false);
+  ctx.fillStyle='#09091b';
+  [footL,footR].forEach((p,i)=>{ctx.save();ctx.translate(p.x,p.y);ctx.rotate((i?0.15:-0.15)-dir*.45*flight);ctx.beginPath();ctx.ellipse(0,0,17,7,0,0,Math.PI*2);ctx.fill();ctx.restore();});
+  ctx.restore();
+}
+
 // ── Draw: goalkeeper canvas fallback ──────────────────────────────────────
 function drawGKCanvas(){
   const sc=L.gh*.567/110, lw=1/sc;
   const gkAnchorFb=(L.gy1+L.gy2)/2+L.gh*1.08*0.41;
-  ctx.save();ctx.translate(A.gkX,gkAnchorFb+A.gkY);ctx.rotate(A.gkAngle*Math.PI/180);ctx.scale(sc,sc);
+  ctx.save();ctx.translate(A.gkX,gkAnchorFb+A.gkY);ctx.rotate(A.gkAngle*Math.PI/180);ctx.scale(sc*(A.gkScaleX||1),sc*(A.gkScaleY||1));
   // Shadow
   const gsh=ctx.createRadialGradient(0,-1,1,0,-1,34);
   gsh.addColorStop(0,'rgba(0,0,0,0.55)');gsh.addColorStop(1,'rgba(0,0,0,0)');
@@ -902,6 +1189,19 @@ function drawBall(){
   }
   drawBallCanvas();
 }
+function drawBallTrail(){
+  if(!A.trail.length)return;
+  ctx.save();
+  ctx.globalCompositeOperation='lighter';
+  for(let i=0;i<A.trail.length;i++){
+    const p=A.trail[i], t=(i+1)/A.trail.length;
+    ctx.fillStyle=`rgba(255,230,120,${p.a*t*.55})`;
+    ctx.beginPath();ctx.ellipse(p.x,p.y,p.r*(.55+t*.18),p.r*(.24+t*.10),A.spin*.25,0,Math.PI*2);ctx.fill();
+    p.a*=.90;
+  }
+  ctx.restore();
+  A.trail=A.trail.filter(p=>p.a>.035);
+}
 function drawBallCanvas(){
   const x=A.ballX,y=A.ballY,r=A.ballR;
   ctx.save();ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.clip();
@@ -934,8 +1234,22 @@ function drawZones(){
   }
   if(A.flashZone>=0&&A.flashAlpha>0){
     const rz=zoneRect(A.flashZone);
-    ctx.fillStyle=A.flashIsGoal?`rgba(0,230,118,${A.flashAlpha*.55})`:`rgba(255,50,50,${A.flashAlpha*.55})`;
+    const cx=rz.x+rz.w/2, cy=rz.y+rz.h/2;
+    const glow=ctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(rz.w,rz.h)*.72);
+    if(A.flashIsGoal){
+      glow.addColorStop(0,`rgba(255,235,59,${A.flashAlpha*.70})`);
+      glow.addColorStop(.55,`rgba(0,230,118,${A.flashAlpha*.35})`);
+      glow.addColorStop(1,'rgba(0,230,118,0)');
+    }else{
+      glow.addColorStop(0,`rgba(255,255,255,${A.flashAlpha*.34})`);
+      glow.addColorStop(.45,`rgba(255,50,50,${A.flashAlpha*.42})`);
+      glow.addColorStop(1,'rgba(255,50,50,0)');
+    }
+    ctx.fillStyle=glow;
     ctx.fillRect(rz.x,rz.y,rz.w,rz.h);
+    ctx.strokeStyle=A.flashIsGoal?`rgba(255,235,59,${A.flashAlpha})`:`rgba(255,255,255,${A.flashAlpha*.8})`;
+    ctx.lineWidth=4;
+    ctx.strokeRect(rz.x+3,rz.y+3,rz.w-6,rz.h-6);
   }
 }
 
@@ -943,7 +1257,7 @@ function drawZones(){
 function drawVignette(){
   const{W,H}=L;
   const vg=ctx.createRadialGradient(W*.5,H*.46,H*.22,W*.5,H*.50,H*.74);
-  vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(.70,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,0.36)');
+  vg.addColorStop(0,'rgba(255,255,255,0.03)');vg.addColorStop(.70,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,0.22)');
   ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
 }
 
@@ -984,19 +1298,49 @@ function draw(){
   // Draw neon posts only when using landscape bg.png on a portrait screen (posts off-screen)
   if(hasBg && L.H>L.W*1.3 && !img.bg_mobile) drawNeonPosts();
   drawZones();
+  drawBallTrail();
   drawBall();
   drawVignette();
   requestAnimationFrame(draw);
 }
 
 // ── UI ─────────────────────────────────────────────────────────────────────
-function showMsg(t,c2){const el=document.getElementById('statusMsg');el.textContent=t;el.style.color=c2;el.classList.add('show');}
-function hideMsg(){document.getElementById('statusMsg').classList.remove('show');}
-function renderPips(){document.getElementById('pips').innerHTML=Array.from({length:TOTAL},(_,i)=>`<div class="pip ${i<gs.results.length?gs.results[i]:''}"></div>`).join('');document.getElementById('shotLabel').textContent=gs.shot<TOTAL?`第 ${gs.shot+1} / ${TOTAL} 球`:''; }
-function renderHUD(){document.getElementById('hGoals').textContent=gs.goals;document.getElementById('hStreak').textContent=gs.streak;document.getElementById('hBest').textContent=gs.best;}
+function kickFeedback(){
+  document.body.classList.remove('shot-shake');
+  void document.body.offsetWidth;
+  document.body.classList.add('shot-shake');
+  setTimeout(()=>document.body.classList.remove('shot-shake'),260);
+}
+function showMsg(t,c2,fx=''){const el=document.getElementById('statusMsg');el.textContent=t;el.style.color=c2;el.className='';void el.offsetWidth;el.classList.add('show');if(fx)el.classList.add(fx);}
+function hideMsg(){const el=document.getElementById('statusMsg');el.className='';}
+function money(n){return n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});}
+function currentWin(){
+  if(!gs.goals)return 0;
+  const idx=Math.min(gs.goals-1,MULTS.length-1);
+  return econ.bet*MULTS[idx];
+}
+function renderPips(){
+  document.getElementById('pips').innerHTML=Array.from({length:TOTAL},(_,i)=>`<div class="pip ${i<gs.results.length?gs.results[i]:''}"></div>`).join('');
+  document.getElementById('shotLabel').textContent=gs.shot<TOTAL?`SHOT ${gs.shot+1} / ${TOTAL}`:'';
+  document.getElementById('multRail').innerHTML=MULTS.map((m,i)=>{
+    const r=gs.results[i];
+    const cls=r==='goal'?'won':r==='miss'?'lost':i===gs.shot?'active':'';
+    return `<div class="multStep ${cls}">x${m}</div>`;
+  }).join('');
+}
+function renderHUD(){
+  document.getElementById('hGoals').textContent=gs.goals;
+  document.getElementById('hStreak').textContent=gs.streak;
+  document.getElementById('hBest').textContent=gs.best;
+  document.getElementById('betValue').textContent=money(econ.bet);
+  document.getElementById('balanceValue').textContent=money(econ.balance+currentWin());
+  const collect=document.getElementById('collectBtn');
+  collect.disabled=currentWin()<=0||gs.busy;
+  collect.textContent=currentWin()>0?`COLLECT ${money(currentWin())}`:'COLLECT';
+}
 function showResult(){
-  const g=gs.goals,[e,t,f]=g===5?['🏆','完美罚球！','守门员完全被你读穿了']:g>=4?['🎉','非常出色！','射门技术一流']:g>=3?['👍','不错！','再练练能更厉害']:g>=2?['😅','还需加油','守门员今天状态很好']:['😭','被守门员统治','下次一定！加油！'];
-  document.getElementById('mEmoji').textContent=e;document.getElementById('mTitle').textContent=t;document.getElementById('mScore').textContent=`${g} / ${TOTAL} 球进网`;document.getElementById('mFlavor').textContent=f;document.getElementById('overlay').classList.add('open');
+  const g=gs.goals,win=currentWin(),[e,t,f]=g===5?['🏆','完美街头射手！','倍率拉满，门将被你晃到怀疑人生']:g>=4?['🎉','高光表现！','连续命中，节奏非常漂亮']:g>=3?['👍','不错的路线！','再压一点死角就能爆发']:g>=2?['😅','还差一点火候','门将读到了你的节奏']:['😭','被门将统治','换个角度再来一轮'];
+  document.getElementById('mEmoji').textContent=e;document.getElementById('mTitle').textContent=t;document.getElementById('mScore').textContent=`${g} / ${TOTAL} 球 · DEMO WIN ${money(win)}`;document.getElementById('mFlavor').textContent=f;document.getElementById('overlay').classList.add('open');
 }
 function restart(){
   gs.shot=0;gs.goals=0;gs.results=[];gs.streak=0;gs.busy=false;gs.phase='idle';
@@ -1004,11 +1348,26 @@ function restart(){
   document.getElementById('overlay').classList.remove('open');document.getElementById('streakBadge').textContent='';document.getElementById('aimHint').style.display='';
   hideMsg();initAnim();renderPips();renderHUD();
 }
+function collectDemo(){
+  const win=currentWin();
+  if(win<=0||gs.busy)return;
+  econ.balance+=win;
+  showMsg(`COLLECT ${money(win)}`,'#00e676','goal-pop');
+  restart();
+}
+function changeBet(delta){
+  if(gs.shot>0||gs.busy)return;
+  econ.bet=Math.max(20,Math.min(500,econ.bet+delta));
+  renderHUD();
+}
 
 // ── Input ──────────────────────────────────────────────────────────────────
 c.addEventListener('mousemove',e=>{const r=c.getBoundingClientRect(),mx=(e.clientX-r.left)*c.width/r.width,my=(e.clientY-r.top)*c.height/r.height;A.hovered=gs.phase==='idle'?zoneAt(mx,my):-1;c.style.cursor=(A.hovered>=0&&gs.phase==='idle')?'crosshair':'default';});
 c.addEventListener('click',e=>{if(gs.phase!=='idle')return;const r=c.getBoundingClientRect(),mx=(e.clientX-r.left)*c.width/r.width,my=(e.clientY-r.top)*c.height/r.height;const z=zoneAt(mx,my);if(z>=0)shoot(z);});
 c.addEventListener('touchstart',e=>{e.preventDefault();if(gs.phase!=='idle')return;const t=e.changedTouches[0],r=c.getBoundingClientRect(),mx=(t.clientX-r.left)*c.width/r.width,my=(t.clientY-r.top)*c.height/r.height;const z=zoneAt(mx,my);if(z>=0)shoot(z);},{passive:false});
+document.getElementById('collectBtn').addEventListener('click',collectDemo);
+document.getElementById('betDown').addEventListener('click',()=>changeBet(-20));
+document.getElementById('betUp').addEventListener('click',()=>changeBet(20));
 
 // ── Init ───────────────────────────────────────────────────────────────────
 function resize(){
@@ -1040,6 +1399,7 @@ function startBGM(){
 
 // Load assets → show "start" button → tap starts game + music
 loadAssets(()=>{
+  try{buildBm8Frames();}catch(err){console.error(err);const h=document.getElementById('lsHint');if(h)h.textContent='BM8 门将帧处理失败，已使用备用门将：'+err.message;}
   const lsTxt=document.querySelector('#loadScreen .ls-txt');
   const lsHint=document.getElementById('lsHint');
   const lsBar=document.querySelector('.ls-bar');
